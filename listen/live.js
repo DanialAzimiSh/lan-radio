@@ -1,0 +1,122 @@
+/* Low-latency player for the radio's MP3 stream, shared by the listener page and the admin panel.
+ *
+ * A plain <audio src=stream> lets the browser decide: Chrome gathers ~5 s before it starts and then
+ * stays that far behind live for good. Here the page fetches the stream itself and feeds it to Media
+ * Source Extensions, so it decides: start right away, play ~0.8 s behind the newest audio, and jump
+ * forward whenever a network hiccup leaves it more than 2 s behind.
+ *
+ *   fetch(/stream) ──chunks──> SourceBuffer ──> <audio> ──> speakers
+ *                                  │                ▲
+ *                                  └── every 0.5 s: if behind > maxLag, seek to newest − target
+ *
+ * iPhone Safari has no MSE for MP3 (and suspends it in the background), so it keeps the plain element
+ * and only trims what it buffered at start.
+ */
+window.createLivePlayer = function (audio, url, { target = 0.8, maxLag = 2, onReconnect = () => {} } = {}) {
+  const iOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const mse = !iOS && !!window.MediaSource && MediaSource.isTypeSupported('audio/mpeg');
+  const tail = ranges => (ranges.length ? ranges.end(ranges.length - 1) : 0);
+  let session = null, wanted = false, retry = 0;
+
+  function concat(parts) {
+    const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+    let at = 0;
+    for (const p of parts) { out.set(p, at); at += p.length; }
+    return out;
+  }
+
+  function close() {
+    if (!session) return;
+    session.ctrl.abort();
+    clearInterval(session.timer);
+    session = null;
+  }
+
+  function fail() {
+    if (!wanted) return;
+    close();
+    onReconnect();
+    clearTimeout(retry);
+    retry = setTimeout(() => wanted && start().catch(() => {}), 2500);
+  }
+
+  function pump(s) {
+    const sb = s.sb;
+    if (session !== s || !sb || sb.updating || s.ms.readyState !== 'open') return;
+    const b = sb.buffered;
+    // drop what was played: Chrome caps an audio SourceBuffer at ~12 MB, a few minutes of 192 kbps
+    if (b.length && audio.currentTime - b.start(0) > 30) { sb.remove(b.start(0), audio.currentTime - 10); return; }
+    if (!s.queue.length) return;
+    const parts = s.queue.splice(0);
+    try { sb.appendBuffer(parts.length === 1 ? parts[0] : concat(parts)); } catch (e) { fail(); }
+  }
+
+  async function feed(s) {
+    URL.revokeObjectURL(audio.src);
+    const sb = s.sb = s.ms.addSourceBuffer('audio/mpeg');
+    sb.mode = 'sequence';
+    let atLive = false;
+    sb.addEventListener('updateend', () => {
+      // the first chunk carries Icecast's burst of the last seconds; skip it and start at the live edge
+      if (!atLive && tail(sb.buffered) > target + 0.3) { atLive = true; audio.currentTime = tail(sb.buffered) - target; }
+      pump(s);
+    });
+    try {
+      const res = await fetch(url + (url.includes('?') ? '&' : '?') + 't=' + Date.now(), { signal: s.ctrl.signal, cache: 'no-store' });
+      if (!res.ok || !res.body) throw new Error('HTTP ' + res.status);
+      const reader = res.body.getReader();
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) throw new Error('stream closed');
+        s.queue.push(value);
+        pump(s);
+      }
+    } catch (e) {
+      if (session === s) fail();
+    }
+  }
+
+  function openMse() {
+    const s = session = { ctrl: new AbortController(), ms: new MediaSource(), sb: null, queue: [], timer: 0 };
+    audio.src = URL.createObjectURL(s.ms);
+    s.ms.addEventListener('sourceopen', () => feed(s), { once: true });
+    s.timer = setInterval(() => {
+      if (session !== s || !s.sb || audio.paused) return;
+      const newest = tail(s.sb.buffered);
+      if (newest - audio.currentTime > maxLag) audio.currentTime = newest - target;
+    }, 500);
+  }
+
+  function openPlain() {
+    session = { ctrl: new AbortController(), timer: 0 };
+    audio.src = url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
+    audio.addEventListener('playing', () => {
+      try {
+        const newest = tail(audio.buffered);
+        if (newest - audio.currentTime > maxLag) audio.currentTime = newest - target;
+      } catch (e) {}
+    }, { once: true });
+  }
+
+  function start() {
+    wanted = true;
+    clearTimeout(retry);
+    close();
+    (mse ? openMse : openPlain)();
+    return audio.play();
+  }
+
+  function stop() {
+    wanted = false;
+    clearTimeout(retry);
+    close();
+    audio.pause();
+    audio.removeAttribute('src');
+    audio.load();
+  }
+
+  audio.addEventListener('error', () => wanted && fail());
+  audio.addEventListener('ended', () => wanted && fail());
+
+  return { start, stop, lowLatency: mse, get wanted() { return wanted; } };
+};

@@ -1,0 +1,4 @@
+# local settings and passwords (template: .env.example)
+.env
+
+*.log
