@@ -2,3 +2,8 @@
 .env
 
 *.log
+node_modules/
+
+# IDE settings
+.idea/
+.vscode/
