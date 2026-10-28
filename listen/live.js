@@ -44,11 +44,11 @@ window.createLivePlayer = function (audio, url, { target = 0.8, maxLag = 2, onRe
     const sb = s.sb;
     if (session !== s || !sb || sb.updating || s.ms.readyState !== 'open') return;
     const b = sb.buffered;
-    // drop what was played: Chrome caps an audio SourceBuffer at ~12 MB, a few minutes of 192 kbps
+    // drop what was played: Chrome caps an audio SourceBuffer at ~12 MB, a few minutes of 320 kbps
     if (b.length && audio.currentTime - b.start(0) > 30) { sb.remove(b.start(0), audio.currentTime - 10); return; }
     if (!s.queue.length) return;
     const parts = s.queue.splice(0);
-    try { sb.appendBuffer(parts.length === 1 ? parts[0] : concat(parts)); } catch (e) { fail(); }
+    try { sb.appendBuffer(parts.length === 1 ? parts[0] : concat(parts)); } catch { fail(); }
   }
 
   async function feed(s) {
@@ -71,7 +71,7 @@ window.createLivePlayer = function (audio, url, { target = 0.8, maxLag = 2, onRe
         s.queue.push(value);
         pump(s);
       }
-    } catch (e) {
+    } catch {
       if (session === s) fail();
     }
   }
@@ -94,7 +94,7 @@ window.createLivePlayer = function (audio, url, { target = 0.8, maxLag = 2, onRe
       try {
         const newest = tail(audio.buffered);
         if (newest - audio.currentTime > maxLag) audio.currentTime = newest - target;
-      } catch (e) {}
+      } catch { /* Safari may refuse to seek a live stream; it simply stays where it is */ }
     }, { once: true });
   }
 

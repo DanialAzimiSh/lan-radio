@@ -1,0 +1,15 @@
+{
+  "name": "lan-radio",
+  "private": true,
+  "description": "Dev tooling only (the radio itself runs in Docker): lints the listener page's and the admin panel's JavaScript (the listener page including its GSAP animations).",
+  "type": "module",
+  "scripts": {
+    "lint": "eslint --max-warnings 0 listen/ panel/js/"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.1",
+    "@mehshekari/eslint-plugin-gsap-motion": "4.6.1",
+    "eslint": "9.39.1",
+    "globals": "16.5.0"
+  }
+}
