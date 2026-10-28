@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>پنل رادیو</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/panel/panel.css">
+<script src="/panel/js/core.js"></script>
+<script src="/panel/js/sections.js"></script>
+<script src="/panel/js/live.js"></script>
+<script defer src="/panel/vendor/alpine.min.js"></script>
+</head>
+<body x-data="app()" x-cloak>
+<audio x-ref="player" preload="none"></audio>
+
+<div class="shell">
+  <!-- ================= sidebar ================= -->
+  <aside class="side" :class="{ open: menu }">
+    <div class="brand"><span>📻</span> رادیو</div>
+
+    <div class="nav-title">پخش</div>
+    <a class="nav" href="#/dashboard" :class="{ on: tab === 'dashboard' }"><span class="ic">🏠</span> داشبورد</a>
+    <a class="nav" href="#/playlist" :class="{ on: tab === 'playlist' }"><span class="ic">📜</span> لیست پخش</a>
+    <a class="nav" href="#/library" :class="{ on: tab === 'library' }"><span class="ic">🎵</span> کتابخانه</a>
+    <a class="nav" href="#/live" :class="{ on: tab === 'live' }"><span class="ic">🎙</span> پخش زنده <i class="dot" x-show="r.live.airing"></i></a>
+
+    <div class="nav-title">شنونده‌ها</div>
+    <a class="nav" href="#/messages" :class="{ on: tab === 'messages' }"><span class="ic">✉</span> پیام‌ها <b class="n" x-show="r.st && r.st.messages_unread" x-text="r.st && r.st.messages_unread"></b></a>
+    <a class="nav" href="#/requests" :class="{ on: tab === 'requests' }"><span class="ic">🎶</span> درخواست‌ها <b class="n" x-show="r.st && r.st.requests_pending" x-text="r.st && r.st.requests_pending"></b></a>
+    <a class="nav" href="#/uploads" :class="{ on: tab === 'uploads' }"><span class="ic">⬆</span> آهنگ‌های ارسالی <b class="n" x-show="r.st && r.st.uploads_pending" x-text="r.st && r.st.uploads_pending"></b></a>
+
+    <div class="nav-title">سیستم</div>
+    <a class="nav" href="#/settings" :class="{ on: tab === 'settings' }"><span class="ic">⚙</span> تنظیمات</a>
+
+    <div class="side-foot">
+      <span x-show="r.listeners !== null">👥 <b x-text="r.fa(r.listeners)"></b> شنونده‌ی آنلاین</span>
+      <button @click="toggleListen()" x-text="listening ? '🔇 قطع صدا' : '🎧 گوش دادن از همین‌جا'"></button>
+      <button @click="r.logout()" title="خروج از پنل در این مرورگر">خروج</button>
+    </div>
+  </aside>
+  <div class="scrim" x-show="menu" @click="menu = false" x-cloak></div>
+
+  <!-- ================= content ================= -->
+  <main class="content">
+    <div class="topbar">
+      <button class="burger" @click="menu = !menu" aria-label="منو">☰</button>
+      <h1 x-text="title"></h1>
+      <span class="pill" x-show="r.listeners !== null">👥 <span x-text="r.fa(r.listeners)"></span></span>
+    </div>
+    <div class="offline" x-show="r.offline">پنل به رادیو وصل نیست</div>
+
+    <template x-if="r.st">
+      <div>
+
+      <!-- ---------- dashboard ---------- -->
+      <section class="stack" x-show="tab === 'dashboard'">
+        <div class="card hero">
+          <div class="state" :class="{ paused: r.st.paused, live: r.live.airing }"
+               x-text="r.live.airing ? '🔴 روی آنتن: پخش زنده' : r.st.paused ? '⏸ متوقف — شنونده‌ها سکوت می‌شنوند' : '● در حال پخش'"></div>
+          <div class="title" dir="auto" x-text="r.titleText"></div>
+          <div class="artist" dir="auto" x-text="r.artistText"></div>
+          <div class="note" x-show="r.playing && r.isHidden(r.playing) && !r.live.airing" x-text="'🙈 شنونده‌ها به‌جای اسم و کاور این آهنگ فقط «' + r.st.hidden_title + '» می‌بینند'"></div>
+          <div class="likes-now" x-text="r.mood"></div>
+          <div class="bar" dir="ltr"><div :style="{ width: r.progress() + '%' }"></div></div>
+          <div class="times" dir="ltr"><span x-text="r.fmt(r.elapsed())"></span><span x-text="r.live.airing ? '' : r.fmt(r.st.now.duration)"></span></div>
+          <div class="controls">
+            <button class="primary" @click="r.post('pause', { paused: !r.st.paused })" x-text="r.st.paused ? '▶ ادامه' : '⏸ توقف'"></button>
+            <button @click="r.post('skip', {}, 'رفت آهنگ بعدی')">⏭ آهنگ بعدی</button>
+            <button :class="{ on: r.isHidden(r.playing) }" x-show="r.playing && !r.live.airing" @click="r.toggleHidden(r.playing)"
+                    title="اسم و کاور این آهنگ را از شنونده‌ها مخفی کن" x-text="r.isHidden(r.playing) ? '👁 نمایش بده' : '🙈 مخفی کن'"></button>
+          </div>
+          <div class="seg" style="width: fit-content">
+            <button :class="{ on: r.st.mode === 'normal' }" @click="r.post('mode', { mode: 'normal' }, 'به ترتیب')">به ترتیب</button>
+            <button :class="{ on: r.st.mode === 'randomize' }" @click="r.post('mode', { mode: 'randomize' }, 'شافل')">شافل</button>
+            <button :class="{ on: r.st.mode === 'random' }" @click="r.post('mode', { mode: 'random' }, 'تصادفی')">تصادفی</button>
+          </div>
+        </div>
+
+        <div class="stats" style="margin-top: 0">
+          <button class="stat" @click="go('messages')" :class="{ hot: r.st.messages_unread }"><b x-text="r.st.messages_unread"></b><span>✉ پیام جدید</span></button>
+          <button class="stat" @click="go('requests')" :class="{ hot: r.st.requests_pending }"><b x-text="r.st.requests_pending"></b><span>🎶 درخواست در انتظار</span></button>
+          <button class="stat" @click="go('uploads')" :class="{ hot: r.st.uploads_pending }"><b x-text="r.st.uploads_pending"></b><span>⬆ آهنگ منتظر تأیید</span></button>
+          <button class="stat" @click="go('playlist')"><b x-text="r.st.tracks.length"></b><span>📜 آهنگ در لیست پخش</span></button>
+        </div>
+
+        <div class="card" x-show="r.st.queue.length">
+          <div class="card-head"><h2>بعدی پخش می‌شود <span class="pill" x-text="r.fa(r.st.queue.length) + ' آهنگ'"></span></h2></div>
+          <ol class="feed">
+            <template x-for="(f, i) in r.st.queue" :key="i + f">
+              <li class="row"><span class="num" x-text="r.fa(i + 1)"></span><span class="meta"><span class="nm" dir="auto" x-text="r.base(f)"></span><span class="fd" dir="auto" x-text="r.dir(f)"></span></span></li>
+            </template>
+          </ol>
+        </div>
+      </section>
+
+      <!-- ---------- playlist ---------- -->
+      <section class="stack" x-show="tab === 'playlist'" x-data="playlist">
+        <div class="card" x-show="r.st.queue.length">
+          <div class="card-head">
+            <h2>صف «بعدی پخش شود» <span class="pill" x-text="r.fa(r.st.queue.length) + ' آهنگ'"></span></h2>
+            <button @click="r.post('queue/clear', {}, 'صف پاک شد')">پاک کردن صف</button>
+          </div>
+          <ol class="rows">
+            <template x-for="(f, i) in r.st.queue" :key="i + f">
+              <li class="row"><span class="num" x-text="r.fa(i + 1)"></span><span class="meta"><span class="nm" dir="auto" x-text="r.base(f)"></span><span class="fd" dir="auto" x-text="r.dir(f)"></span></span></li>
+            </template>
+          </ol>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>لیست پخش <span class="pill" x-text="r.fa(r.st.tracks.length) + ' آهنگ' + (r.st.hidden.length ? ' · ' + r.fa(r.st.hidden.length) + ' مخفی' : '')"></span></h2>
+          </div>
+          <ol class="rows">
+            <template x-for="(f, i) in r.st.tracks" :key="i + f">
+              <li class="row" draggable="true"
+                  :class="{ playing: f === r.playing && !r.live.airing, dragging: from === i, 'drag-over': over === i && from !== null }"
+                  @dragstart="from = i; $event.dataTransfer.effectAllowed = 'move'; $event.dataTransfer.setData('text/plain', String(i))"
+                  @dragover.prevent="over = i" @drop.prevent="drop(i)" @dragend="from = null; over = null">
+                <span class="grip" title="بکش و جابه‌جا کن">⋮⋮</span>
+                <span class="num" x-text="r.fa(i + 1)"></span>
+                <span class="meta">
+                  <span class="nm" dir="auto" x-text="r.base(f)"></span>
+                  <span class="sub"><span class="fd" dir="auto" x-text="r.dir(f)"></span><span class="tag" x-text="tag(f, i)"></span>
+                    <span class="fd" x-show="r.isHidden(f)">🙈 مخفی از شنونده</span><span class="tag lk" x-show="r.likeOf(f)" x-text="'❤️ ' + r.fa(r.likeOf(f))"></span></span>
+                </span>
+                <span class="acts">
+                  <button :class="{ on: r.isHidden(f) }" @click="r.toggleHidden(f)" x-text="r.isHidden(f) ? '🙈' : '👁'" :title="r.isHidden(f) ? 'شنونده‌ها اسم و کاور این آهنگ را نمی‌بینند؛ بزن تا نمایش داده شود' : 'اسم و کاور را از شنونده‌ها مخفی کن'"></button>
+                  <button title="همین حالا پخش کن" @click="r.post('play', { file: f, index: i }, 'پخش شد')">▶</button>
+                  <button title="بعد از آهنگ فعلی پخش کن" @click="r.post('next', { file: f }, 'به صف اضافه شد')">بعدی</button>
+                  <button title="یکی بالاتر" @click="up(i)">▲</button>
+                  <button title="یکی پایین‌تر" @click="down(i)">▼</button>
+                  <button class="danger" title="حذف از لیست (فایل پاک نمی‌شود)" @click="remove(i)">✕</button>
+                </span>
+              </li>
+            </template>
+          </ol>
+          <div class="empty" x-show="!r.st.tracks.length">لیست خالیه. از کتابخانه آهنگ اضافه کن.</div>
+        </div>
+      </section>
+
+      <!-- ---------- library ---------- -->
+      <section class="stack" x-show="tab === 'library'" x-data="library">
+        <div class="card">
+          <div class="card-head">
+            <h2>کتابخانه <span class="pill" x-text="r.fa(items.length) + ' از ' + r.fa(r.lib.length)"></span></h2>
+            <button @click="addAll()">افزودن همه‌ی نتیجه‌ها به لیست</button>
+          </div>
+          <div class="tools">
+            <input type="search" placeholder="جستجو در آهنگ‌ها…" x-model="q" @input="reset()">
+            <select x-model="folder" @change="reset()">
+              <option value="">همه‌ی پوشه‌ها</option>
+              <option value="__hidden__">🙈 فقط مخفی‌ها</option>
+              <option value="__liked__">❤️ لایک‌شده‌ها (پرطرفدارها اول)</option>
+              <template x-for="d in folders" :key="d"><option :value="d" x-text="d"></option></template>
+            </select>
+            <button title="دوباره خواندن پوشه‌ی موزیک" @click="r.loadLibrary(true)">↻</button>
+          </div>
+          <ul class="rows">
+            <template x-for="f in shown" :key="f">
+              <li class="row">
+                <span class="meta">
+                  <span class="nm" dir="auto" x-text="r.base(f)"></span>
+                  <span class="sub"><span class="fd" dir="auto" x-text="r.dir(f)"></span><span class="fd" x-show="r.isHidden(f)">🙈 مخفی از شنونده</span><span class="tag lk" x-show="r.likeOf(f)" x-text="'❤️ ' + r.fa(r.likeOf(f))"></span></span>
+                </span>
+                <span class="tag ok" x-show="inList(f)">✓ در لیست</span>
+                <span class="acts">
+                  <button :class="{ on: r.isHidden(f) }" @click="r.toggleHidden(f)" x-text="r.isHidden(f) ? '🙈' : '👁'"></button>
+                  <button title="به انتهای لیست پخش اضافه کن" @click="add(f)">＋</button>
+                  <button title="بعد از آهنگ فعلی پخش کن" @click="r.post('next', { file: f }, 'به صف اضافه شد')">بعدی</button>
+                  <button title="همین حالا پخش کن" @click="r.post('play', { file: f, index: -1 }, 'پخش شد')">▶</button>
+                </span>
+              </li>
+            </template>
+            <li class="empty" x-show="!items.length">چیزی پیدا نشد.</li>
+            <li class="empty" x-show="items.length > limit"><button @click="limit += 200" x-text="'نمایش بیشتر (' + r.fa(items.length - limit) + ' آهنگ دیگر)'"></button></li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ---------- live ---------- -->
+      <section class="stack" x-show="tab === 'live'" x-data="live">
+        <div class="card live-card" :class="{ airing: live.airing }">
+          <div class="card-head">
+            <h2>🎙 پخش زنده <span class="badge" :class="{ airing: live.airing, waiting: live.connected && !live.airing }" x-text="badge"></span></h2>
+            <label class="toggle" title="خاموش: منبع زنده روی آنتن نمی‌رود و اتصال جدید پذیرفته نمی‌شود">
+              <input type="checkbox" :checked="live.allowed" :disabled="busy" @change="setAllowed($event.target.checked)"> اجازه‌ی پخش زنده
+            </label>
+          </div>
+          <div class="muted" x-text="status"></div>
+          <div class="live-row">
+            <div class="seg">
+              <button :class="{ on: kind === 'system' }" :disabled="on" @click="setKind('system')">🖥 صدای ویندوز</button>
+              <button :class="{ on: kind === 'mic' }" :disabled="on" @click="setKind('mic')">🎤 میکروفون</button>
+            </div>
+            <input type="text" maxlength="80" placeholder="عنوان برنامه برای شنونده‌ها" x-model="title" @input="titleChanged()">
+            <button class="go" :class="{ on: on }" :disabled="!secure || others" :title="others ? 'یک منبع زنده‌ی دیگر الان وصل است' : ''" @click="toggle()" x-text="on ? '⏹ پایان پخش زنده' : '🔴 شروع پخش زنده'"></button>
+          </div>
+          <div class="meter" x-show="on"><div x-ref="meter"></div></div>
+          <p class="hint" x-html="hint"></p>
+          <details class="conn">
+            <summary>اتصال از برنامه‌های پخش (BUTT، Mixxx، ffmpeg) یا یک دستگاه دیگر</summary>
+            <p>
+              نوع سرور: <code>Icecast</code> · آدرس: <code x-text="r.host"></code> · پورت: <code>8005</code> · Mount: <code>/live</code><br>
+              کاربر: <code>source</code> · رمز: مقدار <code>LIVE_PASSWORD</code> در فایل <code>.env</code> · فرمت: MP3 یا Ogg<br>
+              تا وقتی برنامه وصل است، رادیو صدای آن را پخش می‌کند و موزیک بعد از قطع اتصال از همان‌جا ادامه پیدا می‌کند.
+            </p>
+          </details>
+        </div>
+      </section>
+
+      <!-- ---------- messages ---------- -->
+      <section class="stack" x-show="tab === 'messages'" x-data="messages">
+        <div class="card">
+          <div class="card-head">
+            <h2>✉ پیام شنونده‌ها <span class="badge new" x-show="d && d.unread" x-text="d && (r.fa(d.unread) + ' جدید')"></span></h2>
+            <button @click="act('read', 0)">همه را خوانده کن</button>
+            <button @click="act('delete', 0)">پاک کردن خوانده‌ها</button>
+          </div>
+          <ul class="feed">
+            <template x-for="m in (d ? d.items : [])" :key="m.id">
+              <li class="item" :class="{ fresh: !m.read }">
+                <div class="who"><b dir="auto" x-text="m.name || 'ناشناس'"></b><span x-text="r.time(m.at)"></span><span dir="auto" x-text="'🎵 ' + m.title"></span></div>
+                <div class="body" dir="auto" x-text="m.text"></div>
+                <div class="acts">
+                  <button x-show="!m.read" @click="act('read', m.id)">خوانده شد</button>
+                  <button class="danger" @click="act('delete', m.id)">حذف</button>
+                </div>
+              </li>
+            </template>
+          </ul>
+          <div class="empty" x-show="d && !d.items.length">هنوز پیامی نیامده</div>
+        </div>
+      </section>
+
+      <!-- ---------- requests ---------- -->
+      <section class="stack" x-show="tab === 'requests'" x-data="requests">
+        <div class="card">
+          <div class="card-head">
+            <h2>🎶 درخواست آهنگ <span class="badge new" x-show="d && d.pending" x-text="d && (r.fa(d.pending) + ' جدید')"></span></h2>
+            <label class="toggle" title="روشن: درخواست‌هایی که آهنگ‌شان در کتابخانه هست مستقیم به «بعدی پخش کن» می‌روند">
+              <input type="checkbox" :checked="d && d.mode === 'auto'" @change="setMode($event.target.checked)"> پذیرش خودکار
+            </label>
+            <button @click="load('/clear', {})">پاک کردن پاسخ‌داده‌ها</button>
+          </div>
+          <ul class="feed">
+            <template x-for="g in open" :key="g.id">
+              <li class="item fresh">
+                <div class="what" dir="auto">
+                  <span x-text="g.file ? '🎵 ' + g.label : '📝 ' + g.text"></span>
+                  <small dir="auto" x-show="g.file" x-text="g.file"></small>
+                  <small x-text="(g.names.length > 1 ? r.fa(g.names.length) + ' نفر: ' : '') + g.names.join('، ') + ' · ' + r.clock(g.at)"></small>
+                </div>
+                <div class="acts">
+                  <button class="primary" @click="act('accept', g.id)" x-text="g.file ? 'بعدی پخش کن' : 'انجام شد'"></button>
+                  <button class="danger" @click="act('reject', g.id)">رد</button>
+                </div>
+              </li>
+            </template>
+            <template x-for="i in answered" :key="i.id">
+              <li class="item done"><div class="what" dir="auto"><span x-text="i.file ? '🎵 ' + i.label : '📝 ' + i.text"></span><small x-text="(i.name || 'ناشناس') + ' · ' + state(i.status)"></small></div></li>
+            </template>
+          </ul>
+          <div class="empty" x-show="d && !open.length && !answered.length">هنوز درخواستی نیامده</div>
+        </div>
+      </section>
+
+      <!-- ---------- uploads ---------- -->
+      <section class="stack" x-show="tab === 'uploads'" x-data="uploads">
+        <div class="card">
+          <div class="card-head">
+            <h2>⬆ آهنگ‌های ارسالی <span class="badge new" x-show="d && d.items.length" x-text="d && (r.fa(d.items.length) + ' منتظر')"></span></h2>
+          </div>
+          <p class="quota" x-show="d" x-text="d && ('قرنطینه: ' + r.mb(d.used) + ' از ' + r.mb(d.quota) + ' مگابایت · هر فایل حداکثر ' + r.mb(d.max_bytes) + ' مگابایت · بعد از ۷ روز بی‌پاسخ خودکار پاک می‌شود')"></p>
+          <ul class="feed">
+            <template x-for="u in (d ? d.items : [])" :key="u.id">
+              <li class="item fresh">
+                <div class="what" dir="auto"><span x-text="'⬆ ' + u.orig"></span><small x-text="(u.name || 'ناشناس') + ' · ' + r.mb(u.size) + ' MB · ' + r.fmt(u.secs) + ' · ' + r.time(u.at)"></small></div>
+                <div class="acts">
+                  <button class="primary" @click="approve(u.id, false)">تأیید</button>
+                  <button @click="approve(u.id, true)">تأیید و بعدی پخش کن</button>
+                  <button class="danger" @click="reject(u.id)">رد و حذف</button>
+                </div>
+                <audio controls preload="none" :src="'/api/uploads/audio?id=' + u.id"></audio>
+              </li>
+            </template>
+          </ul>
+          <div class="empty" x-show="d && !d.items.length">آهنگی در انتظار نیست</div>
+        </div>
+      </section>
+
+      <!-- ---------- settings ---------- -->
+      <section class="stack" x-show="tab === 'settings'" x-data="settings">
+        <div class="card">
+          <div class="card-head"><h2>🎶 درخواست آهنگ</h2></div>
+          <template x-if="d">
+            <div>
+              <div class="setting">
+                <div class="what"><b>نمایش فهرست آهنگ‌ها در جستجو</b><small>خاموش: شنونده نمی‌تواند در کتابخانه بگردد و فقط اسم آهنگ را برای مدیر می‌نویسد؛ پس نمی‌فهمد چه آهنگ‌هایی هست. روشن: جستجو و درخواست مستقیم از کتابخانه (آهنگ‌های مخفی هیچ‌وقت نشان داده نمی‌شوند).</small></div>
+                <label class="switch"><input type="checkbox" :checked="d.catalog_public" @change="setCatalog($event.target.checked)"></label>
+              </div>
+              <div class="setting">
+                <div class="what"><b>پذیرش خودکار درخواست‌ها</b><small>روشن: درخواست‌های کتابخانه بدون تأیید مدیر به «بعدی پخش شود» می‌روند. یادداشت‌ها و فایل‌ها همیشه تأیید می‌خواهند.</small></div>
+                <label class="switch"><input type="checkbox" :checked="d.request_mode === 'auto'" @change="setMode($event.target.checked)"></label>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>🗄 پایگاه داده</h2></div>
+          <div class="setting">
+            <div class="what"><b>نمایشگر پایگاه داده</b><small>لایک‌ها، واکنش‌ها، پیام‌ها، درخواست‌ها و ارسالی‌ها در فایل SQLite هستند و SQLite درگاه شبکه ندارد؛ این نمایشگر مرورگری، فقط‌خواندنی و با رمز <code class="k">DB_PASSWORD</code> (در <code class="k">.env</code>) روی پورت ۸۰۰۲ است. جدول <code class="k">sessions</code> توکن‌های ورود پنل را دارد.</small></div>
+            <a :href="dbUrl" target="_blank" rel="noopener"><button>باز کردن ↗</button></a>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>🛠 نگهداری</h2></div>
+          <div class="setting">
+            <div class="what"><b>خواندن دوباره‌ی کتابخانه</b><small>اگر آهنگی را مستقیم در پوشه‌ی موزیک اضافه یا حذف کرده‌ای.</small></div>
+            <button @click="r.loadLibrary(true)">↻ بخوان</button>
+          </div>
+          <div class="setting">
+            <div class="what"><b>رمز پنل</b><small>مقدار <code class="k">PANEL_PASSWORD</code> در <code class="k">.env</code>؛ بعد از عوض کردنش و <code class="k">docker compose up -d</code> همه‌ی مرورگرها از پنل خارج می‌شوند.</small></div>
+          </div>
+        </div>
+      </section>
+
+      </div>
+    </template>
+  </main>
+</div>
+
+<div class="toast" :class="{ show: r.toastOn }" x-text="r.toastText"></div>
+
+<div class="login" x-show="r.loggedOut" x-cloak>
+  <form class="card login-card" @submit.prevent="signIn()">
+    <h2>📻 پنل رادیو</h2>
+    <span class="pill">برای مدیریت رادیو، رمز پنل را وارد کن.</span>
+    <input type="password" autocomplete="current-password" placeholder="رمز پنل" required x-model="password" x-ref="pass" x-effect="r.loggedOut && $nextTick(() => $refs.pass.focus())">
+    <button class="primary" type="submit">ورود</button>
+    <p class="login-err" x-text="r.loginError"></p>
+  </form>
+</div>
+</body>
+</html>
