@@ -6,6 +6,7 @@
 <title>پنل رادیو</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="/panel/panel.css">
+<link rel="stylesheet" href="/panel/home.css">
 <script src="/panel/js/core.js"></script>
 <script src="/panel/js/sections.js"></script>
 <script src="/panel/js/live.js"></script>
@@ -24,13 +25,17 @@
     <a class="nav" href="#/playlist" :class="{ on: tab === 'playlist' }"><span class="ic">📜</span> لیست پخش</a>
     <a class="nav" href="#/library" :class="{ on: tab === 'library' }"><span class="ic">🎵</span> کتابخانه</a>
     <a class="nav" href="#/live" :class="{ on: tab === 'live' }"><span class="ic">🎙</span> پخش زنده <i class="dot" x-show="r.live.airing"></i></a>
+    <a class="nav" href="#/jingles" :class="{ on: tab === 'jingles' }"><span class="ic">🔔</span> جینگل و ساعت</a>
+    <a class="nav" href="#/channels" :class="{ on: tab === 'channels' }"><span class="ic">📻</span> کانال‌ها</a>
 
     <div class="nav-title">شنونده‌ها</div>
+    <a class="nav" href="#/notices" :class="{ on: tab === 'notices' }"><span class="ic">📢</span> اعلان‌ها</a>
     <a class="nav" href="#/messages" :class="{ on: tab === 'messages' }"><span class="ic">✉</span> پیام‌ها <b class="n" x-show="r.st && r.st.messages_unread" x-text="r.st && r.st.messages_unread"></b></a>
     <a class="nav" href="#/requests" :class="{ on: tab === 'requests' }"><span class="ic">🎶</span> درخواست‌ها <b class="n" x-show="r.st && r.st.requests_pending" x-text="r.st && r.st.requests_pending"></b></a>
     <a class="nav" href="#/uploads" :class="{ on: tab === 'uploads' }"><span class="ic">⬆</span> آهنگ‌های ارسالی <b class="n" x-show="r.st && r.st.uploads_pending" x-text="r.st && r.st.uploads_pending"></b></a>
 
     <div class="nav-title">سیستم</div>
+    <a class="nav" href="#/stats" :class="{ on: tab === 'stats' }"><span class="ic">📊</span> آمار</a>
     <a class="nav" href="#/settings" :class="{ on: tab === 'settings' }"><span class="ic">⚙</span> تنظیمات</a>
 
     <div class="side-foot">
@@ -46,6 +51,11 @@
     <div class="topbar">
       <button class="burger" @click="menu = !menu" aria-label="منو">☰</button>
       <h1 x-text="title"></h1>
+      <label class="pill">کانال
+        <select :value="r.channelId" :disabled="!r.channels.length" @change="r.selectChannel(+$event.target.value)" aria-label="کانال فعال پنل">
+          <template x-for="c in r.channels" :key="c.id"><option :value="c.id" :selected="c.id === r.channelId" x-text="c.name"></option></template>
+        </select>
+      </label>
       <span class="pill" x-show="r.listeners !== null">👥 <span x-text="r.fa(r.listeners)"></span></span>
     </div>
     <div class="offline" x-show="r.offline">پنل به رادیو وصل نیست</div>
@@ -54,27 +64,181 @@
       <div>
 
       <!-- ---------- dashboard ---------- -->
-      <section class="stack" x-show="tab === 'dashboard'">
-        <div class="card hero">
-          <div class="state" :class="{ paused: r.st.paused, live: r.live.airing }"
-               x-text="r.live.airing ? '🔴 روی آنتن: پخش زنده' : r.st.paused ? '⏸ متوقف — شنونده‌ها سکوت می‌شنوند' : '● در حال پخش'"></div>
-          <div class="title" dir="auto" x-text="r.titleText"></div>
-          <div class="artist" dir="auto" x-text="r.artistText"></div>
-          <div class="note" x-show="r.playing && r.isHidden(r.playing) && !r.live.airing" x-text="'🙈 شنونده‌ها به‌جای اسم و کاور این آهنگ فقط «' + r.st.hidden_title + '» می‌بینند'"></div>
-          <div class="likes-now" x-text="r.mood"></div>
-          <div class="bar" dir="ltr"><div :style="{ width: r.progress() + '%' }"></div></div>
-          <div class="times" dir="ltr"><span x-text="r.fmt(r.elapsed())"></span><span x-text="r.live.airing ? '' : r.fmt(r.st.now.duration)"></span></div>
-          <div class="controls">
-            <button class="primary" @click="r.post('pause', { paused: !r.st.paused })" x-text="r.st.paused ? '▶ ادامه' : '⏸ توقف'"></button>
-            <button @click="r.post('skip', {}, 'رفت آهنگ بعدی')">⏭ آهنگ بعدی</button>
-            <button :class="{ on: r.isHidden(r.playing) }" x-show="r.playing && !r.live.airing" @click="r.toggleHidden(r.playing)"
-                    title="اسم و کاور این آهنگ را از شنونده‌ها مخفی کن" x-text="r.isHidden(r.playing) ? '👁 نمایش بده' : '🙈 مخفی کن'"></button>
+      <section class="stack" x-show="tab === 'dashboard'" x-data="dashboard">
+        <div class="listener-home" :class="{ 'lh-on': publicNow && !publicNow.paused && (previewNow.file || previewNow.title || publicNow.live?.airing), 'lh-broadcast': publicNow?.live?.airing }" :style="{ '--lh-cover': previewNow.file && !publicNow?.live?.airing ? 'url(' + JSON.stringify(coverUrl(previewNow.file)) + ')' : 'none' }">
+          <header class="lh-top">
+            <div class="lh-brand"><b>رادیو</b><small>LAN RADIO · FM</small></div>
+            <div class="lh-onair"><i></i>ON AIR</div>
+          </header>
+
+          <section class="lh-deck">
+            <div class="lh-turntable" aria-hidden="true">
+              <div class="lh-vinyl">
+                <div class="lh-label">
+                  <img :src="coverUrl(previewNow.file)" x-show="previewNow.file && !publicNow?.live?.airing" @load="$el.hidden = false" @error="$el.hidden = true" alt="">
+                  <span>♪</span>
+                </div>
+                <div class="lh-hole"></div>
+              </div>
+              <div class="lh-arm"><i></i></div>
+            </div>
+            <div class="lh-info">
+              <div class="lh-kicker" x-text="publicNow?.live?.airing ? '🔴 پخش زنده' : publicNow?.paused ? 'رادیو موقتاً ساکته' : 'در حال پخش'"></div>
+              <h2 dir="auto" x-text="previewTitle"></h2>
+              <p dir="auto" x-text="previewArtist"></p>
+              <div class="lh-progress" dir="ltr"><div :style="{ width: previewProgress + '%' }"></div></div>
+              <div class="lh-times" dir="ltr"><span x-text="r.fmt(previewElapsed)"></span><span x-text="publicNow?.live?.airing ? 'زنده' : r.fmt(previewNow.duration)"></span></div>
+              <div class="lh-player-row">
+                <button type="button" class="lh-play" @click="toggleListen()" :aria-label="listening ? 'قطع صدای رادیو' : 'پخش رادیو'" x-text="listening ? '❚❚' : '▶'"></button>
+                <label class="lh-volume">🔊 <input type="range" min="0" max="100" x-model="previewVolume" @input="setPreviewVolume($event)" aria-label="بلندی صدا"></label>
+                <span class="lh-listeners" x-show="r.listeners !== null" x-text="r.listeners !== null ? r.fa(r.listeners) + ' نفر دارن گوش می‌دن' : ''"></span>
+              </div>
+              <div class="lh-admin-actions">
+                <span class="lh-admin-label">کنترل پخش</span>
+                <button type="button" @click="r.post('pause', { paused: !r.st.paused })" x-text="r.st.paused ? '▶ ادامه' : '⏸ توقف'"></button>
+                <button type="button" @click="r.post('skip', {}, 'رفت آهنگ بعدی')">⏭ بعدی</button>
+                <button type="button" x-show="r.playing && !r.live.airing" @click="r.toggleHidden(r.playing)" x-text="r.isHidden(r.playing) ? '👁 نمایش نام' : '🙈 مخفی کردن نام'"></button>
+                <select :value="r.st.mode" @change="r.post('mode', { mode: $event.target.value })" aria-label="حالت پخش">
+                  <option value="normal">به ترتیب</option><option value="randomize">شافل</option><option value="random">تصادفی</option>
+                </select>
+                <select x-model="manualJingleName" :disabled="!clips?.jingles?.length || manualBusy" aria-label="انتخاب جینگل برای پخش دستی"><option value="">انتخاب جینگل…</option><template x-for="j in (clips?.jingles || [])" :key="j.name"><option :value="j.name" x-text="j.name"></option></template></select>
+                <button type="button" :disabled="!manualJingleName || manualBusy || clips?.manual?.remaining > 0" @click="playManualJingle()">🔔 پخش روی آهنگ</button>
+                <span class="lh-jingle-state" x-show="clips?.manual?.remaining > 0" x-text="'در حال پخش: ' + clips?.manual?.name"></span>
+              </div>
+            </div>
+          </section>
+
+          <details class="lh-eq">
+            <summary class="lh-eq-head"><div><h3>اکولایزر پخش <span x-text="eqEnabled ? '●' : '○'"></span></h3><small>تنظیم صدای خروجی برای همهٔ شنونده‌ها</small></div><span class="lh-eq-toggle">⌄</span></summary>
+            <div class="lh-eq-body">
+            <label class="lh-eq-switch"><input type="checkbox" :checked="eqEnabled" :disabled="!settings || eqBusy" @change="setEqEnabled($event.target.checked)"><span x-text="eqEnabled ? 'روشن' : 'خاموش'"></span></label>
+            <div class="lh-eq-toolbar">
+              <label>پریست <select :value="eqPreset" :disabled="!settings || eqBusy" @change="applyEqPreset($event.target.value)"><option value="custom">شخصی</option><option value="flat">صاف</option><option value="warm">گرم</option><option value="clear">شفاف</option><option value="bass">باس بیشتر</option><option value="voice">گفتار</option></select></label>
+              <span x-show="eqBusy">در حال اعمال…</span>
+              <span x-show="!eqBusy" x-text="eqEnabled ? 'تغییر هنگام رها کردن نقطه اعمال می‌شود' : 'اکولایزر خاموش است؛ تنظیم باندها ذخیره می‌شود'"></span>
+            </div>
+            <figure class="lh-eq-figure" :aria-busy="eqBusy" :class="{ 'lh-eq-bypassed': !eqEnabled, 'lh-eq-saving': eqBusy }">
+              <figcaption class="lh-eq-caption"><span>منحنی تنظیم باندها</span><output dir="ltr" x-text="eqFrequencies[eqSelected] + ' Hz · ' + eqValue(eqSelected)"></output></figcaption>
+              <div class="lh-eq-plot" dir="ltr">
+                <svg x-ref="eqChart" class="lh-eq-chart" viewBox="0 0 760 250" role="group" aria-label="نمودار قابل تنظیم اکولایزر هفت باند" aria-describedby="eq-graph-help" @pointermove="moveEqPoint($event)" @pointerup="finishEqPoint($event)" @pointercancel="cancelEqPoint($event)" @lostpointercapture="cancelEqPoint($event)">
+                  <g class="lh-eq-grid" aria-hidden="true">
+                    <g><line x1="44" x2="728" y1="24" y2="24"></line><text x="32" y="28" text-anchor="end">+9</text></g>
+                    <g><line x1="44" x2="728" y1="54" y2="54"></line><text x="32" y="58" text-anchor="end">+6</text></g>
+                    <g><line x1="44" x2="728" y1="84" y2="84"></line><text x="32" y="88" text-anchor="end">+3</text></g>
+                    <g><line x1="44" x2="728" y1="114" y2="114" class="lh-eq-zero"></line><text x="32" y="118" text-anchor="end">0</text></g>
+                    <g><line x1="44" x2="728" y1="144" y2="144"></line><text x="32" y="148" text-anchor="end">-3</text></g>
+                    <g><line x1="44" x2="728" y1="174" y2="174"></line><text x="32" y="178" text-anchor="end">-6</text></g>
+                    <g><line x1="44" x2="728" y1="204" y2="204"></line><text x="32" y="208" text-anchor="end">-9</text></g>
+                    <g><line :x1="eqX(0)" :x2="eqX(0)" y1="24" y2="204"></line><text :x="eqX(0)" y="229" text-anchor="middle">60</text></g>
+                    <g><line :x1="eqX(1)" :x2="eqX(1)" y1="24" y2="204"></line><text :x="eqX(1)" y="229" text-anchor="middle">150</text></g>
+                    <g><line :x1="eqX(2)" :x2="eqX(2)" y1="24" y2="204"></line><text :x="eqX(2)" y="229" text-anchor="middle">400</text></g>
+                    <g><line :x1="eqX(3)" :x2="eqX(3)" y1="24" y2="204"></line><text :x="eqX(3)" y="229" text-anchor="middle">1k</text></g>
+                    <g><line :x1="eqX(4)" :x2="eqX(4)" y1="24" y2="204"></line><text :x="eqX(4)" y="229" text-anchor="middle">2.5k</text></g>
+                    <g><line :x1="eqX(5)" :x2="eqX(5)" y1="24" y2="204"></line><text :x="eqX(5)" y="229" text-anchor="middle">6k</text></g>
+                    <g><line :x1="eqX(6)" :x2="eqX(6)" y1="24" y2="204"></line><text :x="eqX(6)" y="229" text-anchor="middle">12k</text></g>
+                    <text x="17" y="13">dB</text><text x="728" y="246" text-anchor="end">Hz</text>
+                  </g>
+                  <path class="lh-eq-area" :d="eqArea" aria-hidden="true"></path>
+                  <path class="lh-eq-curve" :d="eqCurve" aria-hidden="true"></path>
+
+                    <g class="lh-eq-point" :class="{ 'lh-eq-point-active': eqSelected === 0 }" :transform="'translate(' + eqX(0) + ',' + eqY(eqGains[0]) + ')'" role="slider" :tabindex="!settings || eqBusy ? -1 : 0" :aria-disabled="!settings || eqBusy" aria-orientation="vertical" :aria-label="eqFrequencies[0] + ' Hz'" aria-valuemin="-9" aria-valuemax="9" :aria-valuenow="eqGains[0]" :aria-valuetext="eqValue(0)" @focus="eqSelected = 0" @pointerdown="beginEqPoint($event, 0)" @keydown="eqPointKey($event, 0)" @keyup="finishEqKey()" @blur="finishEqKey()" @dblclick.prevent="resetEqPoint(0)">
+                      <title x-text="eqFrequencies[0] + ' Hz · ' + eqValue(0)"></title><circle class="lh-eq-hit" r="18"></circle><circle class="lh-eq-ring" r="11"></circle><circle class="lh-eq-dot" r="5"></circle>
+                    </g>
+
+                    <g class="lh-eq-point" :class="{ 'lh-eq-point-active': eqSelected === 1 }" :transform="'translate(' + eqX(1) + ',' + eqY(eqGains[1]) + ')'" role="slider" :tabindex="!settings || eqBusy ? -1 : 0" :aria-disabled="!settings || eqBusy" aria-orientation="vertical" :aria-label="eqFrequencies[1] + ' Hz'" aria-valuemin="-9" aria-valuemax="9" :aria-valuenow="eqGains[1]" :aria-valuetext="eqValue(1)" @focus="eqSelected = 1" @pointerdown="beginEqPoint($event, 1)" @keydown="eqPointKey($event, 1)" @keyup="finishEqKey()" @blur="finishEqKey()" @dblclick.prevent="resetEqPoint(1)">
+                      <title x-text="eqFrequencies[1] + ' Hz · ' + eqValue(1)"></title><circle class="lh-eq-hit" r="18"></circle><circle class="lh-eq-ring" r="11"></circle><circle class="lh-eq-dot" r="5"></circle>
+                    </g>
+
+                    <g class="lh-eq-point" :class="{ 'lh-eq-point-active': eqSelected === 2 }" :transform="'translate(' + eqX(2) + ',' + eqY(eqGains[2]) + ')'" role="slider" :tabindex="!settings || eqBusy ? -1 : 0" :aria-disabled="!settings || eqBusy" aria-orientation="vertical" :aria-label="eqFrequencies[2] + ' Hz'" aria-valuemin="-9" aria-valuemax="9" :aria-valuenow="eqGains[2]" :aria-valuetext="eqValue(2)" @focus="eqSelected = 2" @pointerdown="beginEqPoint($event, 2)" @keydown="eqPointKey($event, 2)" @keyup="finishEqKey()" @blur="finishEqKey()" @dblclick.prevent="resetEqPoint(2)">
+                      <title x-text="eqFrequencies[2] + ' Hz · ' + eqValue(2)"></title><circle class="lh-eq-hit" r="18"></circle><circle class="lh-eq-ring" r="11"></circle><circle class="lh-eq-dot" r="5"></circle>
+                    </g>
+
+                    <g class="lh-eq-point" :class="{ 'lh-eq-point-active': eqSelected === 3 }" :transform="'translate(' + eqX(3) + ',' + eqY(eqGains[3]) + ')'" role="slider" :tabindex="!settings || eqBusy ? -1 : 0" :aria-disabled="!settings || eqBusy" aria-orientation="vertical" :aria-label="eqFrequencies[3] + ' Hz'" aria-valuemin="-9" aria-valuemax="9" :aria-valuenow="eqGains[3]" :aria-valuetext="eqValue(3)" @focus="eqSelected = 3" @pointerdown="beginEqPoint($event, 3)" @keydown="eqPointKey($event, 3)" @keyup="finishEqKey()" @blur="finishEqKey()" @dblclick.prevent="resetEqPoint(3)">
+                      <title x-text="eqFrequencies[3] + ' Hz · ' + eqValue(3)"></title><circle class="lh-eq-hit" r="18"></circle><circle class="lh-eq-ring" r="11"></circle><circle class="lh-eq-dot" r="5"></circle>
+                    </g>
+
+                    <g class="lh-eq-point" :class="{ 'lh-eq-point-active': eqSelected === 4 }" :transform="'translate(' + eqX(4) + ',' + eqY(eqGains[4]) + ')'" role="slider" :tabindex="!settings || eqBusy ? -1 : 0" :aria-disabled="!settings || eqBusy" aria-orientation="vertical" :aria-label="eqFrequencies[4] + ' Hz'" aria-valuemin="-9" aria-valuemax="9" :aria-valuenow="eqGains[4]" :aria-valuetext="eqValue(4)" @focus="eqSelected = 4" @pointerdown="beginEqPoint($event, 4)" @keydown="eqPointKey($event, 4)" @keyup="finishEqKey()" @blur="finishEqKey()" @dblclick.prevent="resetEqPoint(4)">
+                      <title x-text="eqFrequencies[4] + ' Hz · ' + eqValue(4)"></title><circle class="lh-eq-hit" r="18"></circle><circle class="lh-eq-ring" r="11"></circle><circle class="lh-eq-dot" r="5"></circle>
+                    </g>
+
+                    <g class="lh-eq-point" :class="{ 'lh-eq-point-active': eqSelected === 5 }" :transform="'translate(' + eqX(5) + ',' + eqY(eqGains[5]) + ')'" role="slider" :tabindex="!settings || eqBusy ? -1 : 0" :aria-disabled="!settings || eqBusy" aria-orientation="vertical" :aria-label="eqFrequencies[5] + ' Hz'" aria-valuemin="-9" aria-valuemax="9" :aria-valuenow="eqGains[5]" :aria-valuetext="eqValue(5)" @focus="eqSelected = 5" @pointerdown="beginEqPoint($event, 5)" @keydown="eqPointKey($event, 5)" @keyup="finishEqKey()" @blur="finishEqKey()" @dblclick.prevent="resetEqPoint(5)">
+                      <title x-text="eqFrequencies[5] + ' Hz · ' + eqValue(5)"></title><circle class="lh-eq-hit" r="18"></circle><circle class="lh-eq-ring" r="11"></circle><circle class="lh-eq-dot" r="5"></circle>
+                    </g>
+
+                    <g class="lh-eq-point" :class="{ 'lh-eq-point-active': eqSelected === 6 }" :transform="'translate(' + eqX(6) + ',' + eqY(eqGains[6]) + ')'" role="slider" :tabindex="!settings || eqBusy ? -1 : 0" :aria-disabled="!settings || eqBusy" aria-orientation="vertical" :aria-label="eqFrequencies[6] + ' Hz'" aria-valuemin="-9" aria-valuemax="9" :aria-valuenow="eqGains[6]" :aria-valuetext="eqValue(6)" @focus="eqSelected = 6" @pointerdown="beginEqPoint($event, 6)" @keydown="eqPointKey($event, 6)" @keyup="finishEqKey()" @blur="finishEqKey()" @dblclick.prevent="resetEqPoint(6)">
+                      <title x-text="eqFrequencies[6] + ' Hz · ' + eqValue(6)"></title><circle class="lh-eq-hit" r="18"></circle><circle class="lh-eq-ring" r="11"></circle><circle class="lh-eq-dot" r="5"></circle>
+                    </g>
+
+                </svg>
+              </div>
+              <p class="lh-eq-help" id="eq-graph-help">نقطه‌ها را بالا و پایین بکش؛ دابل‌کلیک برای صفر کردن باند. با کیبورد: کلیدهای جهت برای تغییر و ۰ برای صفر کردن.</p>
+            </figure>
+            <details class="lh-eq-values">
+            <summary>تنظیم دقیق باندها</summary>
+            <div class="lh-eq-bands" dir="ltr" :class="{ 'lh-eq-off': !eqEnabled }">
+              <template x-for="(frequency, i) in eqFrequencies" :key="frequency">
+                <label class="lh-eq-band"><output x-text="(eqGains[i] > 0 ? '+' : '') + Number(eqGains[i]).toFixed(1)" :for="'eq-band-' + i"></output><input :id="'eq-band-' + i" type="range" min="-9" max="9" step="0.5" :value="eqGains[i]" :disabled="!settings || eqBusy" @input="setEqBand(i, $event.target.value)" @change="saveEq()"><span x-text="frequency"></span></label>
+              </template>
+            </div>
+            <div class="lh-eq-scale" dir="ltr"><span>−9 dB</span><span>0 dB</span><span>+9 dB</span></div>
+            </details>
+            </div>
+          </details>
+
+          <div class="lh-interactions">
+            <button type="button" class="lh-heart" x-show="previewNow.id >= 0 && !publicNow?.live?.airing" @click="go('stats')" aria-label="دیدن آمار لایک‌ها">♥</button>
+            <span x-show="previewNow.id >= 0 && !publicNow?.live?.airing" x-text="r.fa(previewNow.likes || 0)"></span>
+            <div class="lh-faces" x-show="previewNow.id >= 0 && !publicNow?.live?.airing"><button type="button" @click="go('stats')" aria-label="آمار واکنش‌ها">🔥</button><button type="button" @click="go('stats')" aria-label="آمار واکنش‌ها">👏</button><button type="button" @click="go('stats')" aria-label="آمار واکنش‌ها">🤩</button><button type="button" @click="go('stats')" aria-label="آمار واکنش‌ها">😴</button></div>
+            <button type="button" @click="go('messages')">✉ پیام به رادیو</button>
+            <button type="button" @click="go('requests')">🎵 درخواست آهنگ</button>
           </div>
-          <div class="seg" style="width: fit-content">
-            <button :class="{ on: r.st.mode === 'normal' }" @click="r.post('mode', { mode: 'normal' }, 'به ترتیب')">به ترتیب</button>
-            <button :class="{ on: r.st.mode === 'randomize' }" @click="r.post('mode', { mode: 'randomize' }, 'شافل')">شافل</button>
-            <button :class="{ on: r.st.mode === 'random' }" @click="r.post('mode', { mode: 'random' }, 'تصادفی')">تصادفی</button>
+
+          <section class="lh-section">
+            <div class="lh-section-head"><h3>اعلان‌ها</h3><button type="button" @click="showNoticeForm = !showNoticeForm" x-text="showNoticeForm ? 'بستن' : '＋ اعلان تازه'"></button><button type="button" @click="go('notices')">مدیریت همه</button></div>
+            <template x-if="previewNotice">
+              <div class="lh-notice-wrap">
+                <article class="lh-notice" :class="{ 'lh-no-image': !previewNotice.image }">
+                  <img x-show="previewNotice.image" :src="'/api/notice/image?id=' + previewNotice.id" @error="$el.hidden = true" alt="">
+                  <div><h4 dir="auto" x-show="previewNotice.title" x-text="previewNotice.title"></h4><p dir="auto" x-show="previewNotice.body" x-text="previewNotice.body"></p><blockquote dir="auto" x-show="previewNotice.quote_text" x-text="previewNotice.quote_text"></blockquote></div>
+                </article>
+                <button type="button" class="lh-admin-mini" @click="endNotice(previewNotice.id)">برداشتن</button>
+              </div>
+            </template>
+            <p class="lh-empty" x-show="!previewNotice">اعلانی برای شنونده نمایش داده نمی‌شود.</p>
+            <form class="lh-editor" x-show="showNoticeForm" @submit.prevent="publishNotice()" x-cloak>
+              <input type="text" maxlength="80" placeholder="عنوان (اختیاری)" x-model="noticeTitle">
+              <textarea rows="3" maxlength="600" placeholder="متن اعلان…" x-model="noticeBody"></textarea>
+              <div><select x-model="noticeStyle" aria-label="نوع اعلان"><option value="banner">نمایش دائمی</option><option value="popup">اعلان گذرا</option></select><select x-model="noticeTtl" aria-label="مدت اعلان"><option value="3600">یک ساعت</option><option value="21600">۶ ساعت</option><option value="86400">یک روز</option><option value="0">تا وقتی برش دارم</option></select><button type="submit" :disabled="noticeBusy || !(noticeTitle.trim() || noticeBody.trim())">نمایش برای همه</button></div>
+            </form>
+          </section>
+
+          <section class="lh-section" x-show="!publicNow?.live?.airing && (previewNow.description || previewNow.facts || r.playing)">
+            <div class="lh-section-head"><h3>دربارهٔ این آهنگ</h3><button type="button" x-show="r.playing && !r.live.airing" @click="openNote()" :disabled="noteBusy">ویرایش متن</button></div>
+            <div class="lh-notes" x-show="previewNow.description || previewNow.facts"><p dir="auto" x-show="previewNow.description" x-text="previewNow.description"></p><ul x-show="previewNow.facts"><template x-for="(fact, i) in (previewNow.facts || '').split('\n').filter(Boolean)" :key="i"><li dir="auto" x-text="fact"></li></template></ul></div>
+            <p class="lh-empty" x-show="!previewNow.description && !previewNow.facts">متنی برای این آهنگ نوشته نشده است.</p>
+            <form class="lh-editor" x-show="noteFile" @submit.prevent="saveNote()" x-cloak>
+              <small dir="auto" x-text="noteFile && r.base(noteFile)"></small>
+              <textarea rows="3" maxlength="2000" placeholder="توضیح آهنگ…" x-model="noteDescription" :disabled="noteBusy"></textarea>
+              <textarea rows="3" maxlength="2000" placeholder="هر نکته در یک خط…" x-model="noteFacts" :disabled="noteBusy"></textarea>
+              <div><button type="submit" :disabled="noteBusy">ذخیره</button><button type="button" @click="noteFile = ''">بستن</button></div>
+            </form>
+          </section>
+
+          <div class="lh-lists">
+            <section class="lh-list" :class="{ 'lh-disabled': !settings?.show_next }">
+              <header><h3 x-text="publicNow?.live?.airing ? 'بعد از پخش زنده' : 'آهنگ‌های بعدی'"></h3><label class="lh-admin-switch">نمایش برای شنونده <input type="checkbox" :checked="settings?.show_next" :disabled="!settings || settingsBusy" @change="saveLists({ show_next: $event.target.checked })"></label><button type="button" class="lh-chevron" :disabled="nextItems.length < 2" :aria-expanded="String(nextExpanded)" @click="nextExpanded = !nextExpanded" x-text="nextExpanded ? '⌃' : '⌄'"></button></header>
+              <ol x-show="settings?.show_next"><template x-for="(n, i) in nextItems" :key="i + ':' + n.file"><li x-show="nextExpanded || i === 0"><span class="lh-thumb"><img :src="coverUrl(n.file)" x-show="n.file" @load="$el.hidden = false" @error="$el.hidden = true" alt="">♪</span><span class="lh-track"><b dir="auto" x-text="trackTitle(n)"></b><small dir="auto" x-text="trackArtist(n)"></small></span></li></template></ol>
+              <p class="lh-empty" x-show="settings?.show_next && !nextItems.length">هنوز آهنگ بعدی مشخص نیست.</p>
+              <p class="lh-empty" x-show="!settings?.show_next">این فهرست برای شنونده خاموش است.</p>
+            </section>
+            <section class="lh-list" :class="{ 'lh-disabled': !settings?.show_recent }">
+              <header><h3>اخیراً پخش شد</h3><label class="lh-admin-switch">نمایش برای شنونده <input type="checkbox" :checked="settings?.show_recent" :disabled="!settings || settingsBusy" @change="saveLists({ show_recent: $event.target.checked })"></label><button type="button" class="lh-chevron" :disabled="recentItems.length < 2" :aria-expanded="String(recentExpanded)" @click="recentExpanded = !recentExpanded" x-text="recentExpanded ? '⌃' : '⌄'"></button></header>
+              <ol x-show="settings?.show_recent"><template x-for="h in recentItems" :key="h.id"><li x-show="recentExpanded || recentItems[0].id === h.id"><span class="lh-thumb"><img :src="coverUrl(h.file)" x-show="h.file" @load="$el.hidden = false" @error="$el.hidden = true" alt="">♪</span><span class="lh-track"><b dir="auto" x-text="trackTitle(h)"></b><small dir="auto" x-text="trackArtist(h)"></small></span><span class="lh-when" x-text="when(h.at)"></span></li></template></ol>
+              <p class="lh-empty" x-show="settings?.show_recent && !recentItems.length">هنوز چیزی پخش نشده است.</p>
+              <p class="lh-empty" x-show="!settings?.show_recent">این فهرست برای شنونده خاموش است.</p>
+            </section>
           </div>
+          <footer class="lh-footer"><a :href="listenerUrl" target="_blank" rel="noopener">باز کردن صفحهٔ شنونده ↗</a><button type="button" @click="go('playlist')">ویرایش لیست پخش</button></footer>
         </div>
 
         <div class="stats" style="margin-top: 0">
@@ -167,6 +331,7 @@
                 <span class="tag ok" x-show="inList(f)">✓ در لیست</span>
                 <span class="acts">
                   <button :class="{ on: r.isHidden(f) }" @click="r.toggleHidden(f)" x-text="r.isHidden(f) ? '🙈' : '👁'"></button>
+                  <button title="توضیحات آهنگ" @click="editNote(f)">درباره</button>
                   <button title="به انتهای لیست پخش اضافه کن" @click="add(f)">＋</button>
                   <button title="بعد از آهنگ فعلی پخش کن" @click="r.post('next', { file: f }, 'به صف اضافه شد')">بعدی</button>
                   <button title="همین حالا پخش کن" @click="r.post('play', { file: f, index: -1 }, 'پخش شد')">▶</button>
@@ -176,6 +341,20 @@
             <li class="empty" x-show="!items.length">چیزی پیدا نشد.</li>
             <li class="empty" x-show="items.length > limit"><button @click="limit += 200" x-text="'نمایش بیشتر (' + r.fa(items.length - limit) + ' آهنگ دیگر)'"></button></li>
           </ul>
+        </div>
+        <div class="card note-editor" x-ref="noteEditor" x-show="noteFile" x-cloak>
+          <div class="card-head">
+            <h2>دربارهٔ آهنگ <span class="pill" dir="auto" x-text="noteFile && r.base(noteFile)"></span></h2>
+            <button type="button" @click="noteFile = ''">بستن</button>
+          </div>
+          <p class="hint">این متن‌ها هنگام پخش آهنگ برای شنونده نمایش داده می‌شوند. آهنگ مخفی توضیحاتش را نشان نمی‌دهد.</p>
+          <form class="form" @submit.prevent="saveNote()">
+            <label for="note-description">توضیح کوتاه</label>
+            <textarea id="note-description" rows="4" maxlength="2000" x-model="noteDescription" placeholder="دربارهٔ این آهنگ…" :disabled="noteBusy"></textarea>
+            <label for="note-facts">نکته‌های جالب</label>
+            <textarea id="note-facts" rows="4" maxlength="2000" x-model="noteFacts" placeholder="هر نکته را در یک خط بنویس…" :disabled="noteBusy"></textarea>
+            <div class="opts"><button type="submit" :disabled="noteBusy || !noteFile">ذخیره</button><small class="muted">برای حذف، هر دو کادر را خالی و ذخیره کن.</small></div>
+          </form>
         </div>
       </section>
 
@@ -224,6 +403,8 @@
                 <div class="who"><b dir="auto" x-text="m.name || 'ناشناس'"></b><span x-text="r.time(m.at)"></span><span dir="auto" x-text="'🎵 ' + m.title"></span></div>
                 <div class="body" dir="auto" x-text="m.text"></div>
                 <div class="acts">
+                  <span class="tag ok" x-show="m.replied" x-text="'✓ ' + r.fa(m.reply_count) + ' پاسخ عمومی'"></span>
+                  <button title="پیام را همراه جوابت برای همه نمایش بده" @click="reply(m)" x-text="m.replied ? '📢 پاسخ دوباره' : '📢 پاسخ عمومی'"></button>
                   <button x-show="!m.read" @click="act('read', m.id)">خوانده شد</button>
                   <button class="danger" @click="act('delete', m.id)">حذف</button>
                 </div>
@@ -282,7 +463,7 @@
                   <button @click="approve(u.id, true)">تأیید و بعدی پخش کن</button>
                   <button class="danger" @click="reject(u.id)">رد و حذف</button>
                 </div>
-                <audio controls preload="none" :src="'/api/uploads/audio?id=' + u.id"></audio>
+                <audio controls preload="none" :src="'/api/uploads/audio?id=' + u.id + (r.channelId ? '&channel=' + r.channelId : '')"></audio>
               </li>
             </template>
           </ul>
@@ -290,8 +471,303 @@
         </div>
       </section>
 
+      <!-- ---------- notices ---------- -->
+      <section class="stack" x-show="tab === 'notices'" x-data="notices">
+        <div class="card">
+          <div class="card-head"><h2 x-text="reply ? '📢 پاسخ عمومی به یک پیام' : '📢 اعلان تازه برای همه'"></h2></div>
+          <div class="quote" x-show="reply">
+            <b dir="auto" x-text="reply && (reply.name || 'ناشناس')"></b>
+            <span dir="auto" x-text="reply && reply.text"></span>
+            <small>این پیام (با همین اسم) همراه جوابت برای همه‌ی شنونده‌ها نمایش داده می‌شود.</small>
+          </div>
+          <form class="form" @submit.prevent="publish()">
+            <input type="text" maxlength="80" placeholder="عنوان (اختیاری)" x-model="form.title" x-show="!reply">
+            <textarea rows="4" maxlength="600" :placeholder="reply ? 'جوابت…' : 'متن اعلان…'" x-model="form.body"></textarea>
+            <div class="pic" x-show="!reply">
+              <label class="filebtn"><input type="file" accept="image/jpeg,image/png,image/gif,image/webp" @change="pickImage($event)">🖼 افزودن عکس</label>
+              <template x-if="preview"><span class="thumb"><img :src="preview" alt=""><button type="button" class="danger" @click="dropImage()">✕</button></span></template>
+              <small class="muted">کنار متن و سمت راست نمایش داده می‌شود (مثل بنر)؛ عکس مربعی بهتر دیده می‌شود. jpg، png، gif یا webp تا ۳ مگابایت. بدون عکس فقط متن نمایش داده می‌شود.</small>
+            </div>
+            <div class="opts">
+              <div class="seg">
+                <button type="button" :class="{ on: form.style === 'banner' }" @click="form.style = 'banner'" title="کارتی بالای صفحه که تا وقتی برش نداری می‌ماند. اگر چند تا باشند یکی‌یکی و نرم عوض می‌شوند. شنونده نمی‌تواند ببندش.">نمایش دائمی</button>
+                <button type="button" :class="{ on: form.style === 'popup' }" @click="form.style = 'popup'" title="نرم می‌آید، به اندازه‌ی خواندنش می‌ماند و نرم می‌رود. هر شنونده فقط یک بار می‌بیند.">اعلان</button>
+              </div>
+              <select x-model="form.ttl" title="تا کی فعال بماند">
+                <option value="3600">یک ساعت</option>
+                <option value="21600">۶ ساعت</option>
+                <option value="86400">یک روز</option>
+                <option value="0">تا وقتی برش دارم</option>
+              </select>
+            </div>
+            <div class="acts">
+              <button type="submit" class="primary" :disabled="!can" x-text="reply ? 'ارسال پاسخ برای همه' : 'نمایش برای همه'"></button>
+              <button type="button" x-show="reply || form.title || form.body || form.image" @click="clear()">انصراف</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>🟢 الان نمایش داده می‌شود <span class="badge" x-show="active.length" x-text="r.fa(active.length)"></span></h2><button type="button" @click="load()">↻ تازه‌سازی</button></div>
+          <ul class="feed">
+            <template x-for="n in active" :key="n.id">
+              <li class="item fresh">
+                <div class="what" dir="auto">
+                  <b x-text="n.title || (n.quote_text ? 'پاسخ به ' + n.quote_name : '')"></b>
+                  <span x-show="n.body" x-text="n.body"></span>
+                  <small x-show="n.quote_text" dir="auto" x-text="'«' + n.quote_text + '»'"></small>
+                  <small x-text="(n.style === 'popup' ? 'اعلان' : 'نمایش دائمی') + (n.image ? ' · با عکس' : '') + ' · ' + left(n) + ' · ' + r.time(n.at)"></small>
+                </div>
+                <div class="acts">
+                  <button class="primary" @click="end(n.id)">برداشتن</button>
+                </div>
+              </li>
+            </template>
+          </ul>
+          <div class="empty" x-show="d && !active.length">الان هیچ اعلانی نمایش داده نمی‌شود. فقط ۸ اعلان آخر هم‌زمان فعال‌اند.</div>
+        </div>
+
+        <div class="card" x-show="past.length">
+          <div class="card-head"><h2>🕘 قبلی‌ها</h2></div>
+          <ul class="feed">
+            <template x-for="n in past" :key="n.id">
+              <li class="item done">
+                <div class="what" dir="auto">
+                  <b x-text="n.title || (n.quote_text ? 'پاسخ به ' + n.quote_name : '')"></b>
+                  <span x-show="n.body" x-text="n.body"></span>
+                  <small x-text="r.time(n.at)"></small>
+                </div>
+                <div class="acts">
+                  <button @click="again(n)" title="متنش را دوباره در فرم بگذار">دوباره</button>
+                  <button class="danger" @click="remove(n.id)">حذف</button>
+                </div>
+              </li>
+            </template>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ---------- channels ---------- -->
+      <section class="stack" x-show="tab === 'channels'" x-data="channels">
+        <div class="card">
+          <div class="card-head"><h2>📻 کانال‌های رادیو</h2><button @click="load()">↻ به‌روزرسانی</button></div>
+          <p class="muted">کانال موردنظر را انتخاب کن تا داشبورد، پخش، اعلان‌ها، پیام‌ها و تنظیمات همان کانال را در بخش‌های پنل مدیریت کنی.</p>
+          <div class="acts">
+            <input type="text" maxlength="60" placeholder="نام کانال تازه" x-model="newName" @keydown.enter.prevent="create()">
+            <button class="primary" @click="create()" :disabled="busy || !newName.trim() || maxChannels === null || d.length >= maxChannels">افزودن کانال</button>
+            <small x-text="maxChannels === null ? 'دریافت ظرفیت…' : r.fa(d.length) + ' از ' + r.fa(maxChannels) + ' کانال (شامل کانال اصلی)'"></small>
+          </div>
+          <div class="acts" x-show="d.length">
+            <span>کانال:</span>
+            <select :value="r.channelId" @change="r.selectChannel(+$event.target.value)"><template x-for="c in d" :key="c.id"><option :value="c.id" :selected="c.id === r.channelId" x-text="c.name"></option></template></select>
+          </div>
+        </div>
+
+        <template x-if="channel">
+          <div class="stack">
+            <div class="card">
+              <div class="card-head"><h2 x-text="channel.name"></h2><a :href="listenerUrl" target="_blank" rel="noopener">باز کردن صفحهٔ شنونده ↗</a></div>
+              <p class="muted">نشانی صدا: <a :href="streamUrl" target="_blank" rel="noopener" x-text="streamUrl"></a></p>
+              <div class="acts">
+                <input type="text" maxlength="60" x-model="editName" placeholder="نام کانال">
+                <button @click="action('rename', {name: editName})" :disabled="busy || !editName.trim()">ذخیرهٔ نام</button>
+                <button class="danger" x-show="channel.id !== 0" @click="remove()" :disabled="busy">حذف کانال</button>
+              </div>
+              <div class="what"><b>در حال پخش</b><span dir="auto" x-text="channel.now.title || (channel.now.file ? r.base(channel.now.file) : 'هنوز آهنگی پخش نمی‌شود')"></span><small dir="auto" x-text="channel.now.artist"></small></div>
+              <div class="acts">
+                <button @click="action('pause', {paused: !channel.paused})" x-text="channel.paused ? '▶ ادامه' : '⏸ توقف'" :disabled="busy"></button>
+                <button @click="action('skip')" :disabled="busy">⏭ آهنگ بعدی</button>
+                <select :value="channel.mode" @change="action('mode', {mode: $event.target.value})" :disabled="busy">
+                  <option value="normal">به ترتیب</option><option value="randomize">بر زدن</option><option value="random">تصادفی</option>
+                </select>
+              </div>
+              <p class="muted" x-show="channel.next.length">صف بعدی: <span x-text="channel.next.map(f => r.base(f)).join('، ')"></span></p>
+            </div>
+
+            <div class="card">
+              <div class="card-head"><h2>فهرست پخش <span class="badge" x-text="r.fa(channel.tracks.length)"></span></h2></div>
+              <div class="acts"><input type="search" placeholder="جستجو در کتابخانه برای افزودن آهنگ" x-model="search" style="min-width:min(100%, 22rem)"><button @click="r.loadLibrary(true)">↻ کتابخانه</button></div>
+              <ul class="feed" x-show="search.trim()">
+                <template x-for="f in matches" :key="f"><li class="item"><div class="what" dir="auto"><b x-text="r.base(f)"></b><small x-text="r.dir(f)"></small></div><div class="acts"><button @click="add(f)" :disabled="busy">افزودن</button><button @click="action('next', {file: f})" :disabled="busy">بعدی</button><button @click="action('play', {file: f})" :disabled="busy">پخش الان</button></div></li></template>
+              </ul>
+              <p class="muted" x-show="search.trim() && !matches.length">آهنگی پیدا نشد.</p>
+              <ul class="feed">
+                <template x-for="(f, i) in channel.tracks" :key="i"><li class="item"><div class="what" dir="auto"><b x-text="r.fa(i + 1) + '. ' + r.base(f)"></b><small x-text="r.dir(f)"></small></div><div class="acts"><button @click="move(i, -1)" :disabled="busy || i === 0">↑</button><button @click="move(i, 1)" :disabled="busy || i === channel.tracks.length - 1">↓</button><button @click="action('next', {file: f})" :disabled="busy">بعدی</button><button @click="action('play', {file: f})" :disabled="busy">پخش الان</button><button class="danger" @click="removeTrack(i)" :disabled="busy">حذف</button></div></li></template>
+              </ul>
+              <p class="muted" x-show="!channel.tracks.length">فهرست خالی است. از جستجوی کتابخانه آهنگ اضافه کن.</p>
+            </div>
+          </div>
+        </template>
+      </section>
+
+      <!-- ---------- stats ---------- -->
+      <section class="stack" x-show="tab === 'stats'" x-data="stats">
+        <div class="card" x-show="r.channelId === 0">
+          <div class="card-head">
+            <h2>📊 شنونده‌ها در طول زمان</h2>
+            <div class="seg">
+              <button :class="{ on: range === '1h' }" @click="range = '1h'">۱ ساعت</button>
+              <button :class="{ on: range === '6h' }" @click="range = '6h'">۶ ساعت</button>
+              <button :class="{ on: range === '24h' }" @click="range = '24h'">۲۴ ساعت</button>
+              <button :class="{ on: range === '7d' }" @click="range = '7d'">۷ روز</button>
+            </div>
+          </div>
+          <template x-if="listeners">
+            <div>
+              <svg class="chart" viewBox="0 0 600 140" preserveAspectRatio="none" dir="ltr"><path class="area" :d="listeners.area"></path><path class="line" :d="listeners.line"></path></svg>
+              <div class="axis" dir="ltr"><span x-text="when(listeners.from)"></span><span x-text="when(listeners.to)"></span></div>
+              <p class="quota" x-text="'بیشترین: ' + r.fa(listeners.max) + ' نفر · میانگین: ' + r.fa(listeners.avg) + ' · الان: ' + r.fa(listeners.last)"></p>
+            </div>
+          </template>
+          <div class="empty" x-show="!listeners && !promError">هنوز داده‌ای نیست؛ Prometheus هر ۱۵ ثانیه یک نمونه می‌گیرد.</div>
+          <div class="empty" x-show="promError">
+            <span x-text="promError"></span>
+            <small class="muted" style="display: block">نمودارها از Prometheus می‌آیند: آدرسش را در <code class="k">PROMETHEUS_URL</code> (فایل <code class="k">.env</code>) بگذار و یک job برای <code class="k">host.docker.internal:9599</code> در Prometheus داشته باش (README، بخش آمار).</small>
+          </div>
+        </div>
+
+        <div class="card" x-show="plays">
+          <div class="card-head"><h2>🎵 آهنگ‌های پخش‌شده در بازه‌ی بالا</h2></div>
+          <template x-if="plays">
+            <div>
+              <svg class="chart" viewBox="0 0 600 140" preserveAspectRatio="none" dir="ltr"><path class="area" :d="plays.area"></path><path class="line" :d="plays.line"></path></svg>
+              <div class="axis" dir="ltr"><span x-text="when(plays.from)"></span><span x-text="when(plays.to)"></span></div>
+            </div>
+          </template>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2 x-text="'🏆 آمار کانال ' + r.channelName"></h2>
+            <div class="seg">
+              <button :class="{ on: days === 1 }" @click="days = 1">امروز</button>
+              <button :class="{ on: days === 7 }" @click="days = 7">۷ روز</button>
+              <button :class="{ on: days === 30 }" @click="days = 30">۳۰ روز</button>
+              <button :class="{ on: days === 0 }" @click="days = 0">همه</button>
+            </div>
+          </div>
+          <p class="muted" x-show="statsError" x-text="statsError"></p>
+          <template x-if="d">
+            <div>
+              <div class="stats" style="margin-top: 0">
+                <div class="stat"><b x-text="d.plays"></b><span>آهنگ پخش شد</span></div>
+                <div class="stat"><b x-text="d.likes"></b><span>لایک</span></div>
+                <div class="stat"><b x-text="d.reactions"></b><span>واکنش</span></div>
+                <div class="stat"><b x-text="d.messages"></b><span>پیام</span></div>
+                <div class="stat"><b x-text="d.requests"></b><span>درخواست</span></div>
+              </div>
+              <div class="cols tops">
+                <div>
+                  <h3>پرپخش‌ترین‌ها</h3>
+                  <ol><template x-for="(t, i) in d.top_played" :key="t.file"><li><span class="num" x-text="r.fa(i + 1)"></span><span class="nm" dir="auto" x-text="t.label"></span><b x-text="r.fa(t.n) + '×'"></b></li></template></ol>
+                  <p class="muted" x-show="!d.top_played.length">هنوز داده‌ای نیست</p>
+                </div>
+                <div>
+                  <h3>پرلایک‌ترین‌ها</h3>
+                  <ol><template x-for="(t, i) in d.top_liked" :key="t.file"><li><span class="num" x-text="r.fa(i + 1)"></span><span class="nm" dir="auto" x-text="t.label"></span><b x-text="'❤️ ' + r.fa(t.n)"></b></li></template></ol>
+                  <p class="muted" x-show="!d.top_liked.length">هنوز لایکی نیست</p>
+                </div>
+                <div>
+                  <h3>پردرخواست‌ترین‌ها</h3>
+                  <ol><template x-for="(t, i) in d.top_requested" :key="t.file"><li><span class="num" x-text="r.fa(i + 1)"></span><span class="nm" dir="auto" x-text="t.label"></span><b x-text="r.fa(t.n) + '×'"></b></li></template></ol>
+                  <p class="muted" x-show="!d.top_requested.length">هنوز درخواستی نیست</p>
+                </div>
+              </div>
+              <p class="quota" x-show="d.first_play" x-text="'آمار پخش از ' + r.time(d.first_play) + ' شروع شده است.'"></p>
+            </div>
+          </template>
+        </div>
+      </section>
+
+      <!-- ---------- jingles ---------- -->
+      <section class="stack" x-show="tab === 'jingles'" x-data="jingles">
+        <audio x-ref="player" preload="none"></audio>
+        <div class="card">
+          <div class="card-head"><h2>🔔 جینگل و اعلام ساعت</h2></div>
+          <template x-if="r.audio">
+            <div>
+              <div class="setting">
+                <div class="what"><b>جینگل بین آهنگ‌ها</b><small>هر چند آهنگ یک بار یکی از جینگل‌های زیر (به‌صورت تصادفی) پخش می‌شود. صفر یعنی خاموش.</small></div>
+                <select :value="r.audio.jingle_every" @change="r.saveAudio({ jingle_every: +$event.target.value })">
+                  <option value="0">خاموش</option>
+                  <template x-for="n in [2, 3, 4, 5, 6, 8, 10, 15]" :key="n"><option :value="n" :selected="n === r.audio.jingle_every" x-text="'هر ' + r.fa(n) + ' آهنگ'"></option></template>
+                </select>
+              </div>
+              <div class="setting">
+                <div class="what"><b>اعلام ساعت</b><small>وقتی ساعت عوض می‌شود، اولین تعویض آهنگ بعدش فایل همان ساعت را پخش می‌کند (آهنگ را وسطش قطع نمی‌کند؛ پس تا چند دقیقه بعد از ساعت پخش می‌شود). برای ساعتی که فایل ندارد چیزی پخش نمی‌شود.</small></div>
+                <label class="switch"><input type="checkbox" :checked="r.audio.time_announce" @change="r.saveAudio({ time_announce: $event.target.checked })"></label>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>🎙 جینگل‌ها <span class="badge" x-show="d" x-text="d && r.fa(d.jingles.length)"></span></h2>
+            <label class="filebtn" x-show="r.channelId === 0"><input type="file" accept="audio/*" :disabled="busy" @change="upload($event, 'jingle')">⬆ افزودن جینگل</label>
+          </div>
+          <p class="quota">برای پخش دستی، «پخش روی آهنگ» را بزن. آهنگ ادامه پیدا می‌کند؛ صدایش کم می‌شود و پس از جینگل برمی‌گردد.</p>
+          <p class="quota" x-show="d?.manual?.remaining > 0" x-text="'در حال پخش: ' + d?.manual?.name"></p>
+          <p class="quota" x-show="d" x-text="d && ('هر فایل تا ' + r.fa(Math.round(d.max_bytes / 1048576)) + ' مگابایت و ' + r.fa(Math.round(d.max_seconds)) + ' ثانیه؛ mp3، m4a، ogg، wav یا flac')"></p>
+          <ul class="feed">
+            <template x-for="j in (d ? d.jingles : [])" :key="j.name">
+              <li class="item">
+                <div class="what" dir="auto"><span x-text="'🎙 ' + j.name"></span><small x-text="r.mb(j.size) + ' MB'"></small></div>
+                <div class="acts">
+                  <button @click="listen('jingle', j.name)">▶ گوش بده</button>
+                  <button :disabled="busy || d?.manual?.remaining > 0" @click="play(j.name)">🔔 پخش روی آهنگ</button>
+                  <button class="danger" x-show="r.channelId === 0" @click="remove('jingle', j.name)">حذف</button>
+                </div>
+              </li>
+            </template>
+          </ul>
+          <div class="empty" x-show="d && !d.jingles.length">هنوز جینگلی نیست. یک فایل صوتی کوتاه با اسم رادیو بگذار.</div>
+        </div>
+
+        <div class="card" x-show="r.channelId === 0">
+          <div class="card-head">
+            <h2>🕐 فایل ساعت‌ها <span class="badge" x-show="d" x-text="d && (r.fa(ready) + ' از ۲۴')"></span></h2>
+          </div>
+          <p class="quota">برای هر ساعت یک فایل صوتی بگذار (مثلاً «ساعت ۱۴ است»). فایل هر ساعت با تازه‌ترین جایگزین می‌شود.</p>
+          <div class="hours">
+            <template x-for="h in (d ? d.hours : [])" :key="h.hour">
+              <div class="hour" :class="{ has: h.name }">
+                <b x-text="r.fa(hh(h.hour))"></b>
+                <span class="acts">
+                  <button x-show="h.name" title="گوش بده" @click="listen('time', h.name)">▶</button>
+                  <label class="filebtn" :title="h.name ? 'جایگزین کن' : 'افزودن'"><input type="file" accept="audio/*" :disabled="busy" @change="upload($event, 'time', h.hour)"><span x-text="h.name ? '↻' : '＋'"></span></label>
+                  <button x-show="h.name" class="danger" title="حذف" @click="remove('time', h.name)">✕</button>
+                </span>
+              </div>
+            </template>
+          </div>
+        </div>
+      </section>
+
       <!-- ---------- settings ---------- -->
       <section class="stack" x-show="tab === 'settings'" x-data="settings">
+        <div class="card">
+          <div class="card-head"><h2>🔊 صدا</h2></div>
+          <template x-if="r.audio">
+            <div>
+              <div class="setting">
+                <div class="what"><b>یکسان‌سازی بلندی صدا</b><small>همه‌ی آهنگ‌ها با بلندی یکسان پخش می‌شوند (ReplayGain). رادیو در پس‌زمینه هر آهنگ را یک بار اندازه می‌گیرد (حدود ۵ ثانیه پردازش برای هر آهنگ)؛ آهنگی که هنوز اندازه‌گیری نشده همان‌طور که هست پخش می‌شود. روی پخش زنده اثری ندارد.</small></div>
+                <label class="switch"><input type="checkbox" :checked="r.audio.loudness" @change="r.saveAudio({ loudness: $event.target.checked })"></label>
+              </div>
+              <div class="setting" x-show="r.audio.loudness">
+                <div class="what"><b>بلندی هدف</b><small>صفر یعنی استاندارد ReplayGain (کمی آرام). عددهای مثبت همه‌ی آهنگ‌ها را بلندتر می‌کنند و یک محدودکننده جلوی پریدن صدا را می‌گیرد.</small></div>
+                <select :value="r.audio.loudness_offset" @change="r.saveAudio({ loudness_offset: +$event.target.value })">
+                  <template x-for="n in [-3, 0, 2, 4, 6]" :key="n"><option :value="n" :selected="n === r.audio.loudness_offset" x-text="(n > 0 ? '+' : '') + n + ' dB' + (n === 2 ? ' (پیش‌فرض)' : '')"></option></template>
+                </select>
+              </div>
+              <div class="setting" x-show="r.audio.loudness">
+                <div class="what"><b>پیشرفت اندازه‌گیری</b><small x-text="r.fa(Math.min(r.audio.loudness_done, r.audio.loudness_total)) + ' فایل از ' + r.fa(r.audio.loudness_total) + ' آهنگ اندازه‌گیری شده است'"></small></div>
+                <progress class="prog" :max="Math.max(1, r.audio.loudness_total)" :value="Math.min(r.audio.loudness_done, r.audio.loudness_total)"></progress>
+              </div>
+            </div>
+          </template>
+        </div>
+
         <div class="card">
           <div class="card-head"><h2>🎶 درخواست آهنگ</h2></div>
           <template x-if="d">
@@ -314,6 +790,23 @@
             <div class="what"><b>نمایشگر پایگاه داده</b><small>لایک‌ها، واکنش‌ها، پیام‌ها، درخواست‌ها و ارسالی‌ها در فایل SQLite هستند و SQLite درگاه شبکه ندارد؛ این نمایشگر مرورگری، فقط‌خواندنی و با رمز <code class="k">DB_PASSWORD</code> (در <code class="k">.env</code>) روی پورت ۸۰۰۲ است. جدول <code class="k">sessions</code> توکن‌های ورود پنل را دارد.</small></div>
             <a :href="dbUrl" target="_blank" rel="noopener"><button>باز کردن ↗</button></a>
           </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>👁 لیست‌های زیر پلیر</h2></div>
+          <template x-if="d">
+            <div>
+              <div class="setting">
+                <div class="what"><b>نمایش «آهنگ بعدی»</b><small>خاموش: شنونده نمی‌فهمد آهنگ بعدی چیست. روشن: صف و ادامه‌ی لیست پخش نشان داده می‌شود (در حالت «به ترتیب» و «شافل»؛ در «تصادفی» فقط چیزهایی که قطعی‌اند، مثل درخواست‌ها). آهنگ مخفی همیشه «موسیقی» دیده می‌شود.</small></div>
+                <label class="switch"><input type="checkbox" :checked="d.show_next" @change="saveLists({ show_next: $event.target.checked })"></label>
+              </div>
+              <div class="setting">
+                <div class="what"><b>نمایش «اخیراً پخش شد»</b><small>خاموش: فقط همان آهنگ در حال پخش دیده می‌شود.</small></div>
+                <label class="switch"><input type="checkbox" :checked="d.show_recent" @change="saveLists({ show_recent: $event.target.checked })"></label>
+              </div>
+              <p class="hint">هر فهرست ابتدا یک آهنگ نشان می‌دهد؛ شنونده با کلیک می‌تواند تا پنج آهنگ را ببیند.</p>
+            </div>
+          </template>
         </div>
 
         <div class="card">

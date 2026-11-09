@@ -16,7 +16,11 @@ document.addEventListener('alpine:init', () => {
     toastOn: false,
     listeners: null,     // Icecast's listener count
     host: location.hostname,
+    channels: [],
+    channelId: (() => { try { return Number(localStorage.getItem('radio.admin.channel') || 0); } catch { return 0; } })(),
     lib: [],             // every library path, loaded once (and on ↻)
+    replyTo: null,       // the message the notices section is answering in public
+    audio: null,         // /api/settings: loudness, jingles, hour announcements (several sections edit it)
 
     // ----- formatting -----
     base: f => f.split('/').pop().replace(/\.[^.]+$/, ''),
@@ -75,11 +79,31 @@ document.addEventListener('alpine:init', () => {
     // any 401 means this browser is not signed in (or the password changed): show the login screen
     async call(path, body) {
       const opts = body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
-      const r = await fetch('/api/' + path, opts);
+      const url = new URL('/api/' + path, location.origin);
+      if (this.channelId && !path.startsWith('channels/')) url.searchParams.set('channel', this.channelId);
+      const r = await fetch(url, opts);
       const data = await r.json().catch(() => ({}));
       if (r.status === 401) { this.loggedOut = true; window.dispatchEvent(new Event('radio:logout')); throw new Error('login'); }
       if (!r.ok) { this.toast('خطا: ' + (data.error || r.status)); throw new Error(data.error || r.status); }
       return data;
+    },
+    // a file as the raw body (clips, pictures); what it is travels in headers
+    async raw(path, body, headers = {}) {
+      const url = new URL('/api/' + path, location.origin);
+      if (this.channelId) url.searchParams.set('channel', this.channelId);
+      const r = await fetch(url, { method: 'POST', headers, body });
+      const data = await r.json().catch(() => ({}));
+      if (r.status === 401) { this.loggedOut = true; window.dispatchEvent(new Event('radio:logout')); throw new Error('login'); }
+      if (!r.ok) { this.toast('خطا: ' + (data.error || r.status)); throw new Error(data.error || r.status); }
+      return data;
+    },
+    async loadAudio() {
+      try { this.audio = await this.call('settings'); } catch { /* login screen or toast already shown */ }
+    },
+    async saveAudio(patch) {
+      const a = this.audio;
+      const body = { loudness: a.loudness, loudness_offset: a.loudness_offset, jingle_every: a.jingle_every, time_announce: a.time_announce, ...patch };
+      try { this.audio = await this.call('settings/audio', body); this.toast('ذخیره شد'); } catch { /* toast shown */ }
     },
     // the radio re-picks its next track right after a change; read again once that has settled
     async post(path, body = {}, msg) {
@@ -98,6 +122,7 @@ document.addEventListener('alpine:init', () => {
       if (!r.ok) { this.loginError = data.error || 'ورود ممکن نشد'; return false; }
       this.loggedOut = false; this.loginError = '';
       await this.refresh();
+      await this.loadChannels();
       this.loadLibrary(false);
       return true;
     },
@@ -110,10 +135,29 @@ document.addEventListener('alpine:init', () => {
       try { this.lib = await this.call('library' + (refresh ? '?refresh=1' : '')); } catch { return; }
       if (refresh) this.toast('کتابخانه دوباره خوانده شد');
     },
+    async loadChannels() {
+      try {
+        this.channels = await this.call('channels');
+        if (!this.channels.some(c => c.id === this.channelId)) {
+          this.channelId = 0;
+          try { localStorage.setItem('radio.admin.channel', '0'); } catch { /* storage blocked */ }
+        }
+      } catch { /* login screen or toast already shown */ }
+    },
+    selectChannel(id) {
+      id = Number(id);
+      if (!Number.isInteger(id) || !this.channels.some(channel => channel.id === id)) return;
+      if (id === this.channelId) return;
+      this.channelId = id;
+      try { localStorage.setItem('radio.admin.channel', String(id)); } catch { /* storage blocked */ }
+      location.reload();
+    },
+    get channelName() { return this.channels.find(channel => channel.id === this.channelId)?.name || 'رادیو'; },
     async loadListeners() {
       try {
         const ice = (await (await fetch(`http://${location.hostname}:8000/status-json.xsl`)).json()).icestats;
-        const src = [].concat(ice.source || []).find(x => (x.listenurl || '').endsWith('/radio'));
+        const mount = this.channelId ? '/channel-' + this.channelId : '/radio';
+        const src = [].concat(ice.source || []).find(x => (x.listenurl || '').endsWith(mount));
         this.listeners = src ? src.listeners : 0;
         this.host = ice.host || location.hostname;   // RADIO_HOST, also right when the panel is on localhost
       } catch { this.listeners = null; }
