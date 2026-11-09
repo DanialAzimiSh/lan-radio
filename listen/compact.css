@@ -1,0 +1,73 @@
+/* Compact listener controls; white difference blending inverts the pixels behind each icon. */
+:root {
+  --icon-message: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.7%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M21%2015a3%203%200%200%201-3%203H8l-5%203V6a3%203%200%200%201%203-3h12a3%203%200%200%201%203%203Z%20M7%208h10M7%2012h6%22%2F%3E%3C%2Fsvg%3E");
+  --icon-request: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.7%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M9%2018V5l10-2v10M9%209l10-2M9%2018c0%202-6%203-6%200s6-3%206%200Zm10-5c0%202-6%203-6%200s6-3%206%200Z%22%2F%3E%3C%2Fsvg%3E");
+  --icon-send: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.7%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m22%202-7%2020-4-9-9-4%2020-7ZM22%202%2011%2013%22%2F%3E%3C%2Fsvg%3E");
+  --icon-close: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.7%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%206%2012%2012M6%2018%2018%206%22%2F%3E%3C%2Fsvg%3E");
+  --icon-copy: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.7%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M9%209h12v12H9ZM15%209V3H3v12h6%22%2F%3E%3C%2Fsvg%3E");
+  --icon-upload: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.7%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2016V3m-5%205%205-5%205%205M4%2016v5h16v-5%22%2F%3E%3C%2Fsvg%3E");
+  --icon-check: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.7%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m5%2012%204%204L19%206%22%2F%3E%3C%2Fsvg%3E");
+}
+/* small icon-only buttons (footer, form actions); the icon inverts whatever is behind it */
+.msg-foot button, .req li button, .req-or label, #copy {
+  display: inline-grid; place-items: center; flex: none; width: 34px; height: 34px; min-width: 34px;
+  padding: 7px; border: 0; border-radius: 10px; background: transparent; box-shadow: none;
+  color: #fff; font-size: 0; line-height: 0; text-decoration: none; cursor: pointer; backdrop-filter: none;
+  transition: background .2s, transform .2s;
+}
+.msg-foot button::before, .req li button::before, .req-or label::before, #copy::before::before {
+  content: ''; display: block; width: 19px; height: 19px; background: #fff;
+  mask: var(--icon) center / contain no-repeat; -webkit-mask: var(--icon) center / contain no-repeat;
+  mix-blend-mode: difference;
+}
+#msg-send { --icon: var(--icon-send); }
+.msg-foot button[type=submit] { background: transparent; border: 0; color: #fff; }
+#msg-cancel, #req-close { --icon: var(--icon-close); }
+.req li button { --icon: var(--icon-send); }
+.req-or label { --icon: var(--icon-upload); }
+#copy { --icon: var(--icon-copy); }
+#copy.copied { --icon: var(--icon-check); }
+.msg-foot button:hover:not(:disabled), .req li button:hover, .req-or label:hover, #copy:hover:hover { background: rgba(255,255,255,.045); transform: translateY(-1px); }
+.msg-foot button:focus-visible, .req li button:focus-visible, #copy:focus-visible:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* reactions are the coloured emoji in round chips; message and request are labelled pills after a divider,
+ * so the two groups never look alike */
+.react { gap: 10px; }
+.faces { gap: 6px; padding-inline-end: 12px; border-inline-end: 1px solid var(--line); }
+.face { width: 42px; height: 42px; padding: 0; justify-content: center; border-radius: 50%; border: 1px solid var(--line); background: rgba(255,255,255,.04); }
+.face .e { font-size: 21px; line-height: 1; }
+.face:hover { border-color: var(--accent); transform: translateY(-1px); }
+.msg-open { display: inline-grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--ink); font-size: 0; cursor: pointer; transition: background .2s, transform .2s; }
+.msg-open::before { content: ''; width: 21px; height: 21px; background: currentColor; mask: var(--icon) center / contain no-repeat; -webkit-mask: var(--icon) center / contain no-repeat; }
+#msg-open { --icon: var(--icon-message); }
+#req-open { --icon: var(--icon-request); }
+.msg-open:hover:not(:disabled) { background: rgba(255,255,255,.06); transform: translateY(-1px); }
+.msg-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* the play button is the biggest thing under the title */
+.controls { gap: 14px; }
+.play { width: 92px; height: 92px; }
+.play svg { width: 36px; height: 36px; }
+.loading .play::after { width: 36px; height: 36px; }
+
+.volume { padding: 8px; border: 0; background: transparent; backdrop-filter: none; }
+.volume button svg, .mute svg { fill: #fff; mix-blend-mode: difference; }
+.love { width: 38px; height: 38px; border: 0; background: transparent; box-shadow: none; backdrop-filter: none; }
+.love .heart { width: 23px; height: 23px; color: #fff; mix-blend-mode: difference; }
+.love.on { background: transparent; border: 0; box-shadow: none; }
+.love.on .heart { color: var(--accent); mix-blend-mode: normal; }
+.love-n { font-size: 13px; }
+.listeners { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--ink); }
+.listeners svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.listeners b { font-weight: 700; }
+.listeners.none { opacity: .45; }
+/* the equalizer ring around the record overflows the player on wide screens: keep what follows clear of it */
+@media (min-width: 861px) { .deck { margin-bottom: 60px; } }
+
+@media (max-width: 520px) {
+  .faces { padding-inline-end: 0; border-inline-end: 0; }
+  .play { width: 84px; height: 84px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .msg-open, .msg-foot button, .req li button, .req-or label, #copy, .face { transition-duration: .01s; }
+}

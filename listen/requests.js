@@ -27,7 +27,7 @@
     if (!open || catalog || loading) return;
     loading = true;
     try {
-      const res = await fetch('/api/catalog');
+      const res = await fetch('/api/catalog' + window.RadioChannel.query);
       const files = res.ok ? await res.json() : [];
       catalog = files.map(f => ({ f, key: norm(f) }));
     } catch { catalog = null; }
@@ -45,7 +45,7 @@
   }
   function button(text, onclick) {
     const b = document.createElement('button');
-    b.type = 'button'; b.textContent = text; b.addEventListener('click', onclick);
+    b.type = 'button'; b.textContent = text; b.title = text; b.addEventListener('click', onclick);
     return b;
   }
 
@@ -67,7 +67,7 @@
   async function send(body) {
     store('radio.name', name.value.trim());
     try {
-      const res = await fetch('/api/request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ listener: RadioLikes.listenerId, name: name.value.trim(), ...body }) });
+      const res = await fetch('/api/request' + window.RadioChannel.query, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ listener: RadioLikes.listenerId, name: name.value.trim(), ...body }) });
       const r = await res.json().catch(() => ({}));
       if (res.ok) {
         say(r.status === 'queued' ? 'درخواستت در صف پخش رفت 🎶' : 'درخواستت ثبت شد، منتظر تأیید مدیر 🙏');
@@ -87,7 +87,7 @@
     if (f.size > MAX_BYTES) { say(`حجم فایل بیشتر از ${fa(30)} مگابایت است`); return; }
     store('radio.name', name.value.trim());
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/api/upload');
+    xhr.open('POST', '/api/upload' + window.RadioChannel.query);
     xhr.setRequestHeader('Content-Type', 'application/octet-stream');
     xhr.setRequestHeader('X-Listener', RadioLikes.listenerId);
     xhr.setRequestHeader('X-Name', encodeURIComponent(name.value.trim()));

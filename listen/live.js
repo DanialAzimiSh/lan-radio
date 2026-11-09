@@ -29,6 +29,7 @@ window.createLivePlayer = function (audio, url, { target = 0.8, maxLag = 2, onRe
     if (!session) return;
     session.ctrl.abort();
     clearInterval(session.timer);
+    if (session.objectUrl) URL.revokeObjectURL(session.objectUrl);
     session = null;
   }
 
@@ -52,7 +53,9 @@ window.createLivePlayer = function (audio, url, { target = 0.8, maxLag = 2, onRe
   }
 
   async function feed(s) {
-    URL.revokeObjectURL(audio.src);
+    if (session !== s || s.ctrl.signal.aborted) return;
+    URL.revokeObjectURL(s.objectUrl);
+    s.objectUrl = '';
     const sb = s.sb = s.ms.addSourceBuffer('audio/mpeg');
     sb.mode = 'sequence';
     let atLive = false;
@@ -77,8 +80,9 @@ window.createLivePlayer = function (audio, url, { target = 0.8, maxLag = 2, onRe
   }
 
   function openMse() {
-    const s = session = { ctrl: new AbortController(), ms: new MediaSource(), sb: null, queue: [], timer: 0 };
-    audio.src = URL.createObjectURL(s.ms);
+    const s = session = { ctrl: new AbortController(), ms: new MediaSource(), sb: null, queue: [], timer: 0, objectUrl: '' };
+    s.objectUrl = URL.createObjectURL(s.ms);
+    audio.src = s.objectUrl;
     s.ms.addEventListener('sourceopen', () => feed(s), { once: true });
     s.timer = setInterval(() => {
       if (session !== s || !s.sb || audio.paused) return;
@@ -118,5 +122,12 @@ window.createLivePlayer = function (audio, url, { target = 0.8, maxLag = 2, onRe
   audio.addEventListener('error', () => wanted && fail());
   audio.addEventListener('ended', () => wanted && fail());
 
-  return { start, stop, lowLatency: mse, get wanted() { return wanted; } };
+  function switchStream(nextUrl) {
+    const resume = wanted;
+    stop();
+    url = nextUrl;
+    return resume ? start() : Promise.resolve();
+  }
+
+  return { start, stop, switchStream, lowLatency: mse, get wanted() { return wanted; } };
 };

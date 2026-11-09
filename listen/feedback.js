@@ -59,7 +59,7 @@
     counts[k]++; // my own tap is already animated: the poll must not animate it a second time
     if (motion) motion.tap(k);
     try {
-      const res = await fetch('/api/react', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ play: id, listener: RadioLikes.listenerId, kind: k }) });
+      const res = await fetch('/api/react' + window.RadioChannel.query, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ play: id, listener: RadioLikes.listenerId, kind: k }) });
       if (res.status === 429 && typeof window.hint === 'function') window.hint('یه کم آروم‌تر 🙂');
     } catch { /* a lost tap just doesn't reach the others */ }
   });
@@ -89,7 +89,7 @@
     if (!body) return;
     send.disabled = true;
     try {
-      const res = await fetch('/api/message', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ play: play ? play.id : -1, listener: RadioLikes.listenerId, name: name.value.trim(), text: body }) });
+      const res = await fetch('/api/message' + window.RadioChannel.query, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ play: play ? play.id : -1, listener: RadioLikes.listenerId, name: name.value.trim(), text: body }) });
       const r = await res.json().catch(() => ({}));
       if (res.ok) {
         store('radio.name', name.value.trim());

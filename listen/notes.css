@@ -1,0 +1,6 @@
+.track-notes { margin-top: 18px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 20px; background: var(--glass); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); overflow-wrap: anywhere; }
+.track-notes[hidden] { display: none; }
+.track-notes h2 { margin: 0 0 10px; color: var(--accent); font-size: 16px; }
+.track-notes p { margin: 0; white-space: pre-wrap; line-height: 1.9; }
+.track-notes ul { margin: 10px 0 0; padding-inline-start: 22px; line-height: 1.9; }
+.track-notes li + li { margin-top: 4px; }

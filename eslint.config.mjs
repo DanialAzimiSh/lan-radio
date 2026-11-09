@@ -11,7 +11,7 @@ export default [
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: "script",
-      globals: { ...globals.browser, gsap: "readonly", Physics2DPlugin: "readonly", Draggable: "readonly", InertiaPlugin: "readonly", SplitText: "readonly", CustomEase: "readonly", ScrambleTextPlugin: "readonly", RadioLikes: "readonly", RadioFeedback: "readonly", RadioRequests: "readonly", createLivePlayer: "readonly" },
+      globals: { ...globals.browser, gsap: "readonly", Physics2DPlugin: "readonly", RadioLikes: "readonly", RadioFeedback: "readonly", RadioNotices: "readonly", RadioRequests: "readonly", createLivePlayer: "readonly" },
     },
     rules: js.configs.recommended.rules,
   },

@@ -1,0 +1,35 @@
+/* NEXT / LAST boards (lists.js): the vertical word, the cover, the song; the list drops down under the board */
+#cards.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 14px; width: 100%; margin: 30px 0 0; }
+#cards.cards.one { grid-template-columns: minmax(0, 460px); justify-content: center; }
+#cards.cards[hidden], #cards .board[hidden] { display: none; }
+.board { position: relative; min-width: 0; }
+.board-face { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; padding: 10px 12px; border: 0; border-radius: 16px; background: rgba(255, 255, 255, .03); color: inherit; font: inherit; text-align: start; cursor: default; transition: background .2s; }
+.board.more .board-face { cursor: pointer; }
+.board.more .board-face:hover, .board.open .board-face { background: rgba(255, 255, 255, .06); }
+.board-face:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.board-tag { flex: none; writing-mode: vertical-rl; text-orientation: upright; font-size: 10px; font-weight: 800; line-height: 1; letter-spacing: 1px; color: var(--accent); user-select: none; }
+.board-now { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
+.board-now .thumb { width: 54px; height: 54px; border-radius: 12px; }
+.board-now .meta { display: grid; min-width: 0; }
+.board-now .t { font-size: 14px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.board-now .a { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.board-drop { position: absolute; z-index: 30; top: calc(100% + 6px); inset-inline: 0; max-height: 60vh; overflow-y: auto; padding: 10px; border-radius: 16px; border: 1px solid var(--line); background: rgba(16, 14, 20, .96); box-shadow: 0 18px 44px rgba(0, 0, 0, .55); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); animation: board-drop .22s ease-out; }
+.board-drop[hidden] { display: none; }
+.board-drop ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.board-drop .track { gap: 10px; }
+.board-drop .thumb { width: 38px; height: 38px; border-radius: 9px; font-size: 14px; box-shadow: none; }
+.board-drop .meta .t { font-size: 13.5px; }
+.board-drop .meta .a { font-size: 11.5px; }
+.board-drop .when { font-size: 11px; opacity: .75; }
+.board-drop .mini-love { padding: 2px 6px; font-size: 12px; }
+@keyframes board-drop { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@media (max-width: 760px) { #cards.cards { grid-template-columns: minmax(0, 1fr); } }
+@media (prefers-reduced-motion: reduce) { .board-drop { animation: none; } }
+
+.track-notes { margin-top: 18px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 20px; background: var(--glass); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); overflow-wrap: anywhere; }
+.track-notes[hidden] { display: none; }
+.track-notes h2 { margin: 0 0 10px; color: var(--accent); font-size: 16px; }
+.track-notes p { margin: 0; white-space: pre-wrap; line-height: 1.9; }
+.track-notes ul { margin: 10px 0 0; padding-inline-start: 22px; line-height: 1.9; }
+.track-notes li + li { margin-top: 4px; }

@@ -143,7 +143,7 @@
 
   async function send(id, liked) {
     try {
-      const res = await fetch('/api/like', {
+      const res = await fetch('/api/like' + window.RadioChannel.query, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ play: id, listener: listenerId, liked })
       });

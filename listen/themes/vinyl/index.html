@@ -1,290 +1,16 @@
 <!doctype html>
-<html lang="fa" dir="rtl">
-<head>
+<html lang="fa" dir="rtl"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#07070c">
 <title>رادیو · زنده</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E📻%3C/text%3E%3C/svg%3E">
-<style>
-@font-face {
-  font-family: "Vazirmatn";
-  src: url("/listen/fonts/Vazirmatn-var.woff2") format("woff2");
-  font-weight: 100 900;
-  font-display: swap;
-}
-:root {
-  --bg: #07070c;
-  --ink: #f6f4ff;
-  --muted: rgba(246, 244, 255, .62);
-  --faint: rgba(246, 244, 255, .10);
-  --glass: rgba(18, 18, 28, .55);
-  --line: rgba(255, 255, 255, .08);
-  --accent: #ff4d6d;
-  --accent-soft: rgba(255, 77, 109, .22);
-  --onair: #ff2a3d;
-  --size: min(78vw, 400px);
-}
-* { box-sizing: border-box; }
-html, body { margin: 0; min-height: 100%; }
-body {
-  background: var(--bg);
-  color: var(--ink);
-  font: 400 15px/1.6 "Vazirmatn", Tahoma, sans-serif;
-  overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
-}
-button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
-
-/* ambient backdrop: the cover, huge and blurred, cross-fading between tracks */
-.backdrop { position: fixed; inset: 0; z-index: 0; overflow: hidden; }
-.backdrop div {
-  position: absolute; inset: -20%;
-  background-size: cover; background-position: center;
-  filter: blur(70px) saturate(1.5) brightness(.55);
-  transform: scale(1.15);
-  opacity: 0; transition: opacity 1.6s ease;
-  animation: drift 40s ease-in-out infinite alternate;
-}
-.backdrop div.on { opacity: 1; }
-@keyframes drift { from { transform: scale(1.15) translate(-2%, -1%) rotate(-2deg); } to { transform: scale(1.3) translate(2%, 2%) rotate(3deg); } }
-.vignette {
-  position: fixed; inset: 0; z-index: 0; pointer-events: none;
-  background:
-    radial-gradient(ellipse at 50% 30%, transparent 0, rgba(7,7,12,.55) 60%, rgba(7,7,12,.92) 100%),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.06'/%3E%3C/svg%3E");
-}
-
-main { position: relative; z-index: 1; max-width: 1120px; margin: 0 auto; padding: 20px 16px 40px; padding-top: max(20px, env(safe-area-inset-top)); }
-
-/* top bar */
-.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.brand { display: flex; align-items: baseline; gap: 10px; }
-.brand b { font-size: 26px; font-weight: 900; letter-spacing: -.5px; }
-.brand small { font-size: 11px; letter-spacing: 3px; color: var(--muted); direction: ltr; }
-.onair {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 6px 14px; border-radius: 999px;
-  border: 1px solid var(--line); background: var(--glass); backdrop-filter: blur(12px);
-  font: 700 12px/1 system-ui, sans-serif; letter-spacing: 2.5px; direction: ltr;
-  color: var(--muted);
-}
-.onair i { width: 9px; height: 9px; border-radius: 50%; background: #555; }
-.live .onair { color: #fff; border-color: rgba(255, 42, 61, .45); }
-.live .onair i { background: var(--onair); box-shadow: 0 0 6px var(--onair), 0 0 18px var(--onair); animation: lamp 1.6s ease-in-out infinite; }
-/* a live broadcast (someone on the mic or sharing their computer's sound) instead of a track */
-.broadcast .onair { background: var(--onair); border-color: var(--onair); }
-.broadcast .vinyl { box-shadow: 0 40px 90px rgba(0,0,0,.65), 0 0 0 1px rgba(255,255,255,.05), 0 0 90px rgba(255, 42, 61, .5); }
-.broadcast .kicker { color: #ff8a95; }
-@keyframes lamp { 50% { opacity: .45; box-shadow: 0 0 2px var(--onair); } }
-
-/* deck: turntable + now playing */
-.deck {
-  display: grid; grid-template-columns: auto 1fr; align-items: center;
-  gap: clamp(28px, 6vw, 72px); margin-top: clamp(28px, 6vh, 64px);
-}
-@media (max-width: 860px) { .deck { grid-template-columns: 1fr; justify-items: center; text-align: center; } }
-
-.turntable { position: relative; width: var(--size); aspect-ratio: 1; flex-shrink: 0; }
-#viz { position: absolute; left: -16%; top: -16%; width: 132%; height: 132%; pointer-events: none; }
-.vinyl {
-  position: absolute; inset: 0; border-radius: 50%;
-  background:
-    radial-gradient(circle, transparent 0 31%, rgba(0,0,0,.35) 31.5%, transparent 33%),
-    repeating-radial-gradient(circle, #121214 0 1.2px, #070708 1.6px 3px),
-    #0a0a0b;
-  box-shadow: 0 40px 90px rgba(0,0,0,.65), 0 0 0 1px rgba(255,255,255,.05), 0 0 60px var(--accent-soft);
-  animation: spin 1.8s linear infinite; animation-play-state: paused;
-  transition: box-shadow 1.2s ease;
-}
-.playing .vinyl { animation-play-state: running; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.turntable::after {
-  /* light sheen that stays still while the record turns */
-  content: ""; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
-  background: conic-gradient(from 40deg, transparent 0 14%, rgba(255,255,255,.09) 19%, transparent 25% 62%, rgba(255,255,255,.06) 68%, transparent 74%);
-}
-.label {
-  position: absolute; inset: 31%; border-radius: 50%; overflow: hidden;
-  background: var(--art, linear-gradient(135deg, #ff4d6d, #3a1c71));
-  box-shadow: 0 0 0 3px rgba(0,0,0,.55), inset 0 0 20px rgba(0,0,0,.35);
-  display: grid; place-items: center;
-}
-.label img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.label img[hidden] { display: none; }
-.label .note { font-size: calc(var(--size) * .11); color: rgba(255,255,255,.85); text-shadow: 0 4px 16px rgba(0,0,0,.4); }
-.label img:not([hidden]) + .note { display: none; }
-.hole { position: absolute; inset: 48.6%; border-radius: 50%; background: #050505; box-shadow: 0 0 0 2px rgba(255,255,255,.18); }
-
-.arm { position: absolute; top: -4%; right: -2%; width: 10%; aspect-ratio: 1; z-index: 2; }
-.arm .base { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #f2f2f2, #8a8a8a 55%, #2c2c2c); box-shadow: 0 8px 20px rgba(0,0,0,.6); }
-.arm .rod {
-  position: absolute; left: 50%; top: 50%; width: 9%; height: 520%;
-  background: linear-gradient(90deg, #6d6d6d, #f4f4f4 45%, #8a8a8a);
-  border-radius: 3px; transform-origin: 50% 0;
-  transform: translateX(-50%) rotate(4deg);
-  transition: transform 1.1s cubic-bezier(.5, 0, .15, 1);
-  box-shadow: 4px 6px 12px rgba(0,0,0,.45);
-}
-.arm .head { position: absolute; bottom: -6%; left: 50%; width: 380%; height: 13%; transform: translateX(-60%) rotate(-24deg); background: linear-gradient(#e6e6e6, #9a9a9a); border-radius: 3px; }
-.playing .arm .rod { transform: translateX(-50%) rotate(22deg); }
-
-/* now playing */
-.info { min-width: 0; width: 100%; }
-.kicker { display: inline-flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); font-weight: 600; }
-.eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; }
-.eq span { width: 3px; height: 30%; background: var(--accent); border-radius: 2px; }
-.playing .eq span { animation: eq .9s ease-in-out infinite; }
-.playing .eq span:nth-child(2) { animation-delay: -.3s; }
-.playing .eq span:nth-child(3) { animation-delay: -.6s; }
-@keyframes eq { 0%, 100% { height: 25%; } 50% { height: 100%; } }
-h1 {
-  margin: 10px 0 4px; font-size: clamp(26px, 4.2vw, 46px); line-height: 1.25; font-weight: 850;
-  letter-spacing: -.3px; overflow-wrap: anywhere;
-  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
-}
-.artist { margin: 0; font-size: clamp(15px, 1.6vw, 19px); color: var(--muted); overflow-wrap: anywhere; }
-
-.progress { margin-top: 22px; height: 4px; border-radius: 4px; background: var(--faint); overflow: hidden; }
-.progress div { height: 100%; width: 0; background: var(--accent); box-shadow: 0 0 12px var(--accent); transition: width 1s linear, background 1.2s; }
-.times { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-
-.controls { display: flex; align-items: center; gap: 18px; margin-top: 22px; flex-wrap: wrap; }
-@media (max-width: 860px) { .controls { justify-content: center; } }
-.play {
-  width: 78px; height: 78px; border-radius: 50%; flex-shrink: 0;
-  display: grid; place-items: center;
-  background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.35), transparent 55%), var(--accent);
-  box-shadow: 0 14px 40px var(--accent-soft), 0 0 0 8px var(--accent-soft);
-  transition: transform .2s ease, background 1.2s, box-shadow 1.2s;
-}
-.play:hover { transform: scale(1.05); }
-.play:active { transform: scale(.96); }
-.play svg { width: 30px; height: 30px; fill: #fff; filter: drop-shadow(0 2px 4px rgba(0,0,0,.3)); }
-.play .i-pause, .playing .play .i-play { display: none; }
-.playing .play .i-pause { display: block; }
-.loading .play svg { opacity: 0; }
-.loading .play::after { content: ""; position: absolute; width: 30px; height: 30px; border-radius: 50%; border: 3px solid rgba(255,255,255,.35); border-top-color: #fff; animation: spin .8s linear infinite; }
-.play { position: relative; }
-
-.volume { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 999px; background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(12px); }
-.volume button svg { width: 20px; height: 20px; fill: var(--ink); display: block; }
-.volume input { -webkit-appearance: none; appearance: none; width: 120px; height: 4px; border-radius: 4px; background: linear-gradient(90deg, var(--accent) var(--v, 80%), var(--faint) var(--v, 80%)); direction: ltr; }
-.volume input::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
-.volume input::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: #fff; }
-/* ❤️ (animated by likes.js) */
-.love-wrap { display: inline-flex; align-items: center; gap: 10px; }
-.love {
-  position: relative; width: 58px; height: 58px; border-radius: 50%; flex-shrink: 0;
-  display: grid; place-items: center; color: var(--ink);
-  background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(12px);
-  transition: background .35s, border-color .35s, box-shadow .35s, color .35s;
-}
-.love[hidden], .love-n[hidden] { display: none; }
-.love:hover { color: #ff8fa3; border-color: rgba(255, 77, 109, .6); }
-.love .beat { display: grid; place-items: center; }
-.love .heart { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.8; transform-origin: 50% 55%; transition: fill .25s; }
-.love.on {
-  color: #fff; border-color: transparent;
-  background: radial-gradient(circle at 30% 25%, #ffa3b5, #ff3d6e 55%, #c2185b);
-  box-shadow: 0 10px 30px rgba(255, 61, 110, .45), 0 0 0 6px rgba(255, 61, 110, .14);
-}
-.love.on .heart { fill: currentColor; stroke: none; }
-.love-n { font-size: 20px; font-weight: 900; color: #ff8fa3; font-variant-numeric: tabular-nums; display: inline-block; }
-.love-fx { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
-/* centred by GSAP (xPercent/yPercent): a CSS `translate` here gets folded into GSAP's own transform, wrongly */
-.love-fx > span { position: absolute; left: 0; top: 0; opacity: 0; }
-.love-fx svg { display: block; width: 100%; height: 100%; fill: currentColor; }
-.love-fx .glow { width: 90px; height: 90px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 77, 109, .75), rgba(255, 77, 109, 0) 70%); }
-.love-fx .ring { width: 58px; height: 58px; border-radius: 50%; border: 3px solid #ff4d6d; }
-.love-fx .ring + .ring { border-color: #ffd166; border-width: 2px; }
-.love-fx .spark { width: 16px; height: 16px; color: #ff4d6d; }
-.love-fx .spark:nth-child(4n) { color: #ffa3b5; }
-.love-fx .spark.dot { width: 7px; height: 7px; border-radius: 50%; background: #ffd166; box-shadow: 0 0 8px #ffd166; }
-.love-fx .spark.dot:nth-child(5n) { background: #ff8fa3; box-shadow: 0 0 8px #ff8fa3; }
-.love-fx .plus { font-size: 17px; font-weight: 900; color: #ff8fa3; white-space: nowrap; text-shadow: 0 2px 10px rgba(255, 61, 110, .6); }
-.love-fx .floater { width: 26px; height: 26px; color: #ff4d6d; filter: drop-shadow(0 4px 10px rgba(255, 61, 110, .5)); }
-.love-fx .floater:nth-child(3n) { color: #ffa3b5; }
-.love-fx .floater:nth-child(4n) { color: #ff7096; }
-.mini-love { font-size: 12px; color: var(--muted); padding: 4px 9px; border-radius: 999px; border: 1px solid transparent; white-space: nowrap; }
-.mini-love:hover { border-color: var(--line); }
-.mini-love.on { color: #ff4d6d; }
-.mini-love.pop { animation: mini-pop .4s ease; }
-@keyframes mini-pop { 40% { transform: scale(1.35); } }
-@media (prefers-reduced-motion: reduce) { .mini-love.pop { animation: none; } }
-/* reactions + message box (animated by feedback.js) */
-.react { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
-@media (max-width: 860px) { .react { justify-content: center; } }
-.faces { display: inline-flex; gap: 6px; }
-.faces[hidden], .msg[hidden], .req[hidden], .req [hidden] { display: none; }
-.face { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px; border-radius: 999px; background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(12px); font-size: 19px; line-height: 1; transition: border-color .25s; }
-.face:hover { border-color: var(--accent); }
-.face .e { display: inline-block; }
-.rfx { position: absolute; left: 50%; top: 0; width: 0; height: 0; pointer-events: none; }
-.rfx > span { position: absolute; left: 0; top: 0; font-size: 22px; line-height: 1; opacity: 0; }
-.msg-open { height: 40px; padding: 0 14px; border-radius: 999px; background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(12px); font-size: 13px; color: var(--muted); }
-.msg-open:hover:not(:disabled) { border-color: var(--accent); color: var(--ink); }
-.msg-open:disabled { opacity: .5; cursor: default; }
-.msg { margin-top: 12px; display: grid; gap: 8px; max-width: 460px; padding: 14px; border-radius: 16px; background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(14px); }
-.msg input, .msg textarea { font: inherit; font-size: 14px; color: var(--ink); background: rgba(255,255,255,.05); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; resize: none; width: 100%; }
-.msg input:focus, .msg textarea:focus { outline: none; border-color: var(--accent); }
-.msg-foot { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
-.msg-foot span { margin-inline-end: auto; }
-.msg-foot button { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); }
-.msg-foot button[type=submit] { background: var(--accent); border-color: transparent; color: #fff; font-weight: 700; }
-.msg-foot button:disabled { opacity: .5; }
-/* song requests (requests.js) */
-.req { margin-top: 12px; display: grid; grid-template-columns: minmax(0, 1fr); box-sizing: border-box; width: 100%; min-width: 0; overflow: hidden; contain: inline-size; gap: 8px; max-width: 460px; padding: 14px; border-radius: 16px; background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(14px); }
-.req input[type=search], .req input[type=text] { font: inherit; font-size: 14px; color: var(--ink); background: rgba(255,255,255,.05); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
-.req input:focus { outline: none; border-color: var(--accent); }
-.req ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
-.req li { min-width: 0; display: flex; align-items: center; gap: 8px; font-size: 13.5px; padding: 6px 8px; border-radius: 10px; background: rgba(255,255,255,.04); }
-.req li > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.req li small { display: block; font-size: 11px; color: var(--muted); }
-.req li button { flex: none; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line); font-size: 12.5px; }
-.req li button:hover { border-color: var(--accent); }
-.req li.none { color: var(--muted); }
-.req-or { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); padding-top: 8px; border-top: 1px solid var(--line); }
-.req-or label { padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line); cursor: pointer; color: var(--ink); }
-.req-or label:hover { border-color: var(--accent); }
-.req-or input { display: none; }
-.req progress { width: 100%; height: 6px; accent-color: var(--accent); }
-.req-mine { font-size: 12.5px; color: var(--muted); }
-.req-mine li { background: none; padding: 2px 0; }
-.listeners { font-size: 13px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
-.listeners b { color: var(--ink); font-weight: 700; }
-.hint { margin-top: 14px; font-size: 13px; color: var(--muted); min-height: 1.6em; }
-
-/* next + history */
-.cards { display: grid; grid-template-columns: 1fr 1.4fr; gap: 16px; margin-top: clamp(36px, 7vh, 72px); }
-@media (max-width: 860px) { .cards { grid-template-columns: 1fr; } }
-.card { border-radius: 20px; padding: 18px; background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); min-width: 0; }
-.card h2 { margin: 0 0 14px; font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: .3px; }
-.track { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.thumb { width: 52px; height: 52px; border-radius: 12px; flex-shrink: 0; overflow: hidden; background: var(--art); display: grid; place-items: center; font-size: 20px; color: rgba(255,255,255,.85); box-shadow: 0 6px 18px rgba(0,0,0,.35); }
-.thumb { position: relative; }
-/* the ♪ sits behind the cover; a missing cover removes the img and leaves the ♪ on the gradient */
-.thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
-.next .thumb { width: 64px; height: 64px; border-radius: 14px; }
-.meta { min-width: 0; flex: 1; }
-.meta .t { font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.meta .a { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.when { font-size: 12px; color: var(--muted); white-space: nowrap; }
-#history { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
-#history .thumb { width: 44px; height: 44px; border-radius: 10px; font-size: 16px; }
-.empty { color: var(--muted); font-size: 14px; }
-
-footer { margin-top: 28px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; font-size: 13px; color: var(--muted); text-align: center; }
-footer code { direction: ltr; font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; color: var(--ink); background: var(--glass); border: 1px solid var(--line); padding: 5px 10px; border-radius: 8px; }
-footer button { font-size: 12.5px; padding: 5px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--glass); }
-footer button:hover { border-color: var(--accent); }
-.theme-link { color: var(--muted); font-size: 12.5px; text-decoration: none; padding: 5px 12px; border-radius: 8px; border: 1px solid var(--line); }
-.theme-link:hover { border-color: var(--accent); color: var(--ink); }
-
-@media (prefers-reduced-motion: reduce) {
-  .vinyl, .backdrop div, .live .onair i, .playing .eq span { animation: none !important; }
-}
-</style>
+<link rel="stylesheet" href="/listen/notices.css">
+<link rel="stylesheet" href="/listen/channels.css">
+<link rel="stylesheet" href="/listen/notes.css">
+<link rel="stylesheet" href="/listen/lists.css">
+<link rel="stylesheet" href="/listen/player.css">
+<link rel="stylesheet" href="/listen/compact.css">
 </head>
 <body>
 <div class="backdrop"><div id="bg-a"></div><div id="bg-b"></div></div>
@@ -293,13 +19,14 @@ footer button:hover { border-color: var(--accent); }
 <main id="app">
   <header class="top">
     <div class="brand"><b>رادیو</b><small>LAN RADIO</small></div>
+    <section class="channel-ruler" id="channel-ruler" aria-label="کانال‌ها" hidden=""></section>
     <div class="onair"><i></i>ON AIR</div>
   </header>
 
   <section class="deck">
     <div class="turntable">
       <canvas id="viz"></canvas>
-      <div class="vinyl"><div class="label" id="label"><img id="cover" alt="" hidden><span class="note" id="note">♪</span></div><div class="hole"></div></div>
+      <div class="vinyl"><div class="label" id="label"><img id="cover" alt="" hidden=""><span class="note" id="note">♪</span></div><div class="hole"></div></div>
       <div class="arm"><div class="base"></div><div class="rod"><div class="head"></div></div></div>
     </div>
 
@@ -312,402 +39,94 @@ footer button:hover { border-color: var(--accent); }
 
       <div class="controls">
         <button class="play" id="play" aria-label="پخش">
-          <svg class="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.2-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>
-          <svg class="i-pause" viewBox="0 0 24 24"><rect x="6" y="5" width="4.2" height="14" rx="1.2"/><rect x="13.8" y="5" width="4.2" height="14" rx="1.2"/></svg>
+          <svg class="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.2-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"></path></svg>
+          <svg class="i-pause" viewBox="0 0 24 24"><rect x="6" y="5" width="4.2" height="14" rx="1.2"></rect><rect x="13.8" y="5" width="4.2" height="14" rx="1.2"></rect></svg>
         </button>
         <div class="volume">
-          <button id="mute" aria-label="بی‌صدا"><svg viewBox="0 0 24 24"><path id="spk" d="M4 9.5v5a1 1 0 0 0 1 1h3l4.3 3.6a.8.8 0 0 0 1.3-.6V5.5a.8.8 0 0 0-1.3-.6L8 8.5H5a1 1 0 0 0-1 1zm12.2-2.1a1 1 0 0 1 1.4 0 6.5 6.5 0 0 1 0 9.2 1 1 0 1 1-1.4-1.4 4.5 4.5 0 0 0 0-6.4 1 1 0 0 1 0-1.4z"/></svg></button>
+          <button id="mute" aria-label="بی‌صدا"><svg viewBox="0 0 24 24"><path id="spk" d="M4 9.5v5a1 1 0 0 0 1 1h3l4.3 3.6a.8.8 0 0 0 1.3-.6V5.5a.8.8 0 0 0-1.3-.6L8 8.5H5a1 1 0 0 0-1 1zm12.2-2.1a1 1 0 0 1 1.4 0 6.5 6.5 0 0 1 0 9.2 1 1 0 1 1-1.4-1.4 4.5 4.5 0 0 0 0-6.4 1 1 0 0 1 0-1.4z"></path></svg></button>
           <input id="vol" type="range" min="0" max="100" value="80" aria-label="بلندی صدا">
         </div>
         <div class="love-wrap">
-          <button class="love" id="love" aria-label="دوستش دارم" title="دوستش دارم" hidden>
-            <span class="beat"><svg class="heart" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-9.6-9.2C.9 7.8 3.2 4 6.9 4c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.7 0 6 3.8 4.5 7.3-2.1 4.6-9.6 9.2-9.6 9.2z"/></svg></span>
+          <button class="love" id="love" aria-label="دوستش دارم" title="دوستش دارم" hidden="">
+            <span class="beat"><svg class="heart" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-9.6-9.2C.9 7.8 3.2 4 6.9 4c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.7 0 6 3.8 4.5 7.3-2.1 4.6-9.6 9.2-9.6 9.2z"></path></svg></span>
             <span class="love-fx" id="love-fx" aria-hidden="true"></span>
           </button>
-          <span class="love-n" id="love-n" hidden></span>
+          <span class="love-n" id="love-n" hidden=""></span>
         </div>
         <div class="listeners" id="listeners"></div>
       </div>
       <div class="react">
-        <div class="faces" id="faces" hidden>
+        <div class="faces" id="faces" hidden="">
           <button class="face" data-kind="fire" title="آتیش"><span class="e">🔥</span><span class="rfx"></span></button>
           <button class="face" data-kind="clap" title="دمت گرم"><span class="e">👏</span><span class="rfx"></span></button>
           <button class="face" data-kind="wow" title="وای"><span class="e">🤩</span><span class="rfx"></span></button>
           <button class="face" data-kind="sleep" title="خوابم گرفت"><span class="e">😴</span><span class="rfx"></span></button>
         </div>
-        <button class="msg-open" id="msg-open" type="button">✉ پیام به رادیو</button>
-        <button class="msg-open" id="req-open" type="button">🎵 درخواست آهنگ</button>
+        <button class="msg-open" id="msg-open" type="button" title="پیام به رادیو">پیام به رادیو</button>
+        <button class="msg-open" id="req-open" type="button" title="درخواست آهنگ">درخواست آهنگ</button>
       </div>
-      <form class="msg" id="msg" hidden>
+      <form class="msg" id="msg" hidden="">
         <input id="msg-name" maxlength="30" placeholder="اسمت (اختیاری)" autocomplete="off">
-        <textarea id="msg-text" maxlength="280" rows="3" placeholder="نظر یا انتقادت را بنویس… (برای آهنگ از «درخواست آهنگ» استفاده کن)" required></textarea>
-        <div class="msg-foot"><span id="msg-count"></span><button type="button" id="msg-cancel">بستن</button><button type="submit" id="msg-send">ارسال</button></div>
+        <textarea id="msg-text" maxlength="280" rows="3" placeholder="نظر یا انتقادت را بنویس… (برای آهنگ از «درخواست آهنگ» استفاده کن)" required=""></textarea>
+      <div class="msg-foot"><span id="msg-count"></span><button type="button" id="msg-cancel" title="بستن پیام">بستن</button><button type="submit" id="msg-send" title="ارسال پیام">ارسال</button></div>
       </form>
-      <div class="req" id="req" hidden>
+      <div class="req" id="req" hidden="">
         <input type="search" id="req-q" placeholder="اسم آهنگ یا خواننده…" autocomplete="off">
         <ul id="req-list"></ul>
         <input type="text" id="req-name" maxlength="30" placeholder="اسمت (اختیاری)" autocomplete="off">
         <div class="req-or">
           <span>آهنگ خودت را داری؟</span>
-          <label>انتخاب فایل<input type="file" id="req-file" accept="audio/*,.mp3,.m4a,.ogg,.opus,.flac,.wav,.aac"></label>
+        <label title="انتخاب فایل آهنگ">انتخاب فایل<input type="file" id="req-file" accept="audio/*,.mp3,.m4a,.ogg,.opus,.flac,.wav,.aac"></label>
           <span>تا ۳۰ مگابایت؛ بعد از تأیید مدیر</span>
         </div>
-        <progress id="req-bar" max="1" value="0" hidden></progress>
-        <ul class="req-mine" id="req-mine" hidden></ul>
-        <div class="msg-foot"><span></span><button type="button" id="req-close">بستن</button></div>
+        <progress id="req-bar" max="1" value="0" hidden=""></progress>
+        <ul class="req-mine" id="req-mine" hidden=""></ul>
+      <div class="msg-foot"><span></span><button type="button" id="req-close" title="بستن درخواست">بستن</button></div>
       </div>
       <div class="hint" id="hint">روی دکمه‌ی پخش بزن تا به رادیو وصل بشی</div>
     </div>
   </section>
 
-  <section class="cards">
-    <div class="card next">
-      <h2 id="next-h">آهنگ بعدی</h2>
-      <div class="track" id="next"><span class="empty">…</span></div>
+  <section id="track-notes" class="track-notes" hidden="">
+    <h2>دربارهٔ این آهنگ</h2>
+    <p id="track-description" dir="auto"></p>
+    <ul id="track-facts" dir="auto"></ul>
+  </section>
+  <section class="cards" id="cards">
+    <div class="board" id="card-next">
+      <button type="button" class="board-face" id="next-toggle" aria-expanded="false" aria-controls="next-drop" aria-label="آهنگ‌های بعدی">
+        <span class="board-tag" aria-hidden="true">NEXT</span><span class="board-now" id="next-now"></span>
+      </button>
+      <div class="board-drop" id="next-drop" hidden=""><ol id="next"></ol></div>
     </div>
-    <div class="card">
-      <h2>اخیراً پخش شد</h2>
-      <ol id="history"><li class="empty">هنوز چیزی پخش نشده</li></ol>
+    <div class="board" id="card-recent">
+      <button type="button" class="board-face" id="recent-toggle" aria-expanded="false" aria-controls="recent-drop" aria-label="اخیراً پخش شد">
+        <span class="board-tag" aria-hidden="true">LAST</span><span class="board-now" id="recent-now"></span>
+      </button>
+      <div class="board-drop" id="recent-drop" hidden=""><ol id="history"></ol></div>
     </div>
   </section>
 
+  <div id="notices" class="notices" aria-live="polite"></div>
   <footer>
+    <label class="theme-picker">پوسته <select id="theme-select" aria-label="انتخاب پوسته"><option value="vinyl">گرامافون</option><option value="studio">استودیو · قرمز</option></select></label>
     <span>لینک مستقیم برای VLC و هر پلیری:</span>
     <code id="link"></code>
-    <button id="copy">کپی</button>
-    <a class="theme-link" href="/radio?theme=tube">🎨 طرح رادیو لامپی</a>
+    <button id="copy" title="کپی لینک">کپی</button>
   </footer>
 </main>
 
 <script src="/listen/live.js"></script>
+<script src="/listen/ruler-carousel.js"></script>
+<script src="/listen/channel-links.js"></script>
 <script src="/listen/vendor/gsap.min.js"></script>
 <script src="/listen/vendor/Physics2DPlugin.min.js"></script>
 <script src="/listen/likes.js"></script>
 <script src="/listen/feedback.js"></script>
 <script src="/listen/requests.js"></script>
-<script>
-const $ = s => document.querySelector(s);
-const app = $('#app');
-const FA = '۰۱۲۳۴۵۶۷۸۹';
-const fa = x => String(x).replace(/\d/g, d => FA[d]);
-const rel = new Intl.RelativeTimeFormat('fa', { numeric: 'auto' });
-const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const coverUrl = f => '/api/cover?f=' + encodeURIComponent(f);
+<script src="/listen/notices.js"></script>
+<script src="/listen/notes.js"></script>
+<script src="/listen/lists.js"></script>
+<script src="/listen/player.js"></script>
 
-// "Ben_Böhmer_Enamour_MP3_4134930_uVidBot.mp3" -> "Ben Böhmer Enamour"
-function clean(file) {
-  const n = (file.split('/').pop() || '').replace(/\.[^.]+$/, '');
-  return n.replace(/_/g, ' ').replace(/\b(MP3|uVidBot)\b/gi, '').replace(/\b\d{5,}\b/g, '').replace(/\s{2,}/g, ' ').trim();
-}
-const titleOf = t => t.title || clean(t.file);
-const artistOf = t => t.artist || '';
-
-function hue(s) { let h = 0; for (const c of s) h = (h * 31 + c.codePointAt(0)) % 360; return h; }
-function fallbackArt(file) {
-  const h = hue(file || 'radio');
-  return `linear-gradient(135deg, hsl(${h} 75% 52%), hsl(${(h + 70) % 360} 70% 28%))`;
-}
-function fmt(s) {
-  if (!(s >= 0) || !isFinite(s)) return '';
-  s = Math.floor(s);
-  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = String(s % 60).padStart(2, '0');
-  return fa(h ? `${h}:${String(m).padStart(2, '0')}:${x}` : `${m}:${x}`);
-}
-
-/* ---------- audio ---------- */
-const audio = new Audio();
-audio.preload = 'none';
-const player = createLivePlayer(audio, '/stream', {
-  onReconnect: () => { app.classList.add('loading'); hint('اتصال قطع شد، دارم دوباره وصل می‌شم…'); }
-});
-let ctx = null, analyser = null, freq = null;
-const iOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
-function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
-function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
-
-const vol = $('#vol');
-vol.value = load('radio.vol') ?? 80;
-function applyVolume() {
-  audio.volume = vol.value / 100;
-  vol.style.setProperty('--v', vol.value + '%');
-  $('#spk').style.opacity = audio.muted || vol.value == 0 ? .35 : 1;
-}
-vol.oninput = () => { audio.muted = false; applyVolume(); store('radio.vol', vol.value); };
-$('#mute').onclick = () => { audio.muted = !audio.muted; applyVolume(); };
-applyVolume();
-
-function setupAnalyser() {
-  // iOS stops Web Audio graphs in the background, so it keeps the plain element (and a calm visualizer)
-  if (ctx || iOS || !window.AudioContext) return;
-  try {
-    ctx = new AudioContext();
-    const src = ctx.createMediaElementSource(audio);
-    analyser = ctx.createAnalyser();
-    analyser.fftSize = 256;
-    analyser.smoothingTimeConstant = .82;
-    freq = new Uint8Array(analyser.frequencyBinCount);
-    src.connect(analyser);
-    analyser.connect(ctx.destination);
-  } catch (e) { analyser = null; }
-}
-
-function start() {
-  setupAnalyser();
-  if (ctx && ctx.state === 'suspended') ctx.resume();
-  app.classList.add('loading');
-  player.start().catch(e => {
-    if (e.name !== 'NotAllowedError') return;   // AbortError = a reconnect replaced the source
-    stop();
-    hint('مرورگر اجازه‌ی پخش نداد؛ دوباره روی پخش بزن');
-  });
-}
-function stop() {
-  player.stop();
-  app.classList.remove('playing', 'loading');
-  hint('قطع شد. هر وقت خواستی دوباره بزن، از همون لحظه‌ی زنده پخش می‌شه');
-}
-$('#play').onclick = () => (player.wanted ? stop() : start());
-audio.addEventListener('playing', () => { app.classList.add('playing'); app.classList.remove('loading'); hint(stationPaused ? 'وصلی، ولی رادیو الان ساکته' : 'زنده داری گوش می‌دی 🎧'); });
-audio.addEventListener('waiting', () => player.wanted && app.classList.add('loading'));
-
-function hint(t) { $('#hint').textContent = t; }
-
-/* ---------- now playing ---------- */
-let now = null, nowAt = 0, shownFile = null, stationPaused = false, bgFlip = false, live = { airing: false, since: 0 };
-
-function setArt(file) {
-  const art = fallbackArt(file);
-  $('#label').style.setProperty('--art', art);
-  $('#note').textContent = '♪';
-  const img = $('#cover');
-  img.hidden = true;
-  setBackdrop(null, art);
-  setAccent(hue(file || 'radio'));
-  if (!file) return;
-  const probe = new Image();
-  probe.onload = () => {
-    if (shownFile !== file) return;
-    img.src = probe.src;
-    img.hidden = false;
-    setBackdrop(probe.src);
-    accentFromImage(probe);
-  };
-  probe.src = coverUrl(file);
-}
-
-function setBackdrop(url, gradient) {
-  bgFlip = !bgFlip;
-  const on = $(bgFlip ? '#bg-a' : '#bg-b'), off = $(bgFlip ? '#bg-b' : '#bg-a');
-  on.style.backgroundImage = url ? `url("${url}")` : gradient;
-  on.classList.add('on');
-  off.classList.remove('on');
-}
-
-function setAccent(h, s = 85, l = 62) {
-  const root = document.documentElement.style;
-  root.setProperty('--accent', `hsl(${h} ${s}% ${l}%)`);
-  root.setProperty('--accent-soft', `hsl(${h} ${s}% ${l}% / .22)`);
-}
-function accentFromImage(img) {
-  try {
-    const c = document.createElement('canvas');
-    c.width = c.height = 32;
-    const x = c.getContext('2d');
-    x.drawImage(img, 0, 0, 32, 32);
-    const d = x.getImageData(0, 0, 32, 32).data;
-    let r = 0, g = 0, b = 0, w = 0;
-    for (let i = 0; i < d.length; i += 4) {
-      const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]);
-      const wt = (mx ? (mx - mn) / mx : 0) ** 2 * (mx / 255) + .001;
-      r += d[i] * wt; g += d[i + 1] * wt; b += d[i + 2] * wt; w += wt;
-    }
-    r /= w * 255; g /= w * 255; b /= w * 255;
-    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
-    let h = 0;
-    if (mx !== mn) {
-      const dl = mx - mn;
-      h = mx === r ? ((g - b) / dl) % 6 : mx === g ? (b - r) / dl + 2 : (r - g) / dl + 4;
-      h = Math.round(h * 60 + 360) % 360;
-    }
-    const sat = mx === mn ? 0 : (mx - mn) / (1 - Math.abs(mx + mn - 1));
-    setAccent(h, Math.round(Math.max(55, Math.min(95, sat * 100 + 25))), 62);
-  } catch (e) {}
-}
-
-function thumb(t) {
-  const art = fallbackArt(t.file);
-  return `<span class="thumb" style="--art:${art}">${t.file ? `<img src="${coverUrl(t.file)}" alt="" onerror="this.remove()">` : ''}♪</span>`;
-}
-function setLiveArt() {
-  $('#label').style.setProperty('--art', 'radial-gradient(circle at 35% 30%, #ff6b6b, #c2112b 55%, #4a0612)');
-  $('#cover').hidden = true;
-  $('#note').textContent = '🎙';
-  setBackdrop(null, 'radial-gradient(circle at 50% 40%, #b0122a, #2a0710 70%)');
-  setAccent(355, 85, 60);
-}
-
-function render(s) {
-  now = s.now; nowAt = performance.now();
-  stationPaused = s.paused;
-  live = s.live || { airing: false, since: 0 };
-  // a hidden track has no file but a title: it is still on air
-  const onAir = !!(now.file || now.title);
-  app.classList.toggle('live', (!s.paused && onAir) || live.airing);
-  app.classList.toggle('broadcast', live.airing);
-  $('#kicker').textContent = live.airing ? '🔴 پخش زنده' : s.paused ? 'رادیو موقتاً ساکته' : 'در حال پخش';
-
-  const shown = live.airing ? 'live:' + live.title : now.file;
-  if (shown !== shownFile) {
-    shownFile = shown;
-    if (live.airing) {
-      $('#title').textContent = live.title || 'پخش زنده';
-      $('#artist').textContent = 'زنده، همین حالا';
-      setLiveArt();
-    } else {
-      // a hidden track arrives with no file and a placeholder title, and gets the neutral art
-      $('#title').textContent = titleOf(now) || 'به‌زودی…';
-      $('#artist').textContent = artistOf(now);
-      setArt(now.file);
-    }
-    if ('mediaSession' in navigator) {
-      navigator.mediaSession.metadata = new MediaMetadata(live.airing
-        ? { title: live.title || 'پخش زنده', artist: 'رادیو', album: 'رادیو · زنده' }
-        : now.file
-          ? { title: titleOf(now), artist: artistOf(now) || 'رادیو', album: 'رادیو · زنده',
-              artwork: [{ src: location.origin + coverUrl(now.file), sizes: '512x512' }] }
-          : { title: now.title || 'رادیو', artist: 'رادیو', album: 'رادیو · زنده' });
-    }
-  }
-  tick();
-
-  // during a broadcast the paused track is what comes back next
-  const n = live.airing && onAir ? now : s.next;
-  $('#next-h').textContent = live.airing ? 'بعد از پخش زنده' : 'آهنگ بعدی';
-  $('#next').innerHTML = n.file
-    ? `${thumb(n)}<div class="meta"><div class="t" dir="auto">${esc(titleOf(n))}</div><div class="a" dir="auto">${esc(artistOf(n))}</div></div>`
-    : `<span class="empty">${s.paused ? 'بعد از برگشتن رادیو' : 'یه سورپرایز…'}</span>`;
-
-  const past = s.history.slice(1, 8);
-  $('#history').innerHTML = past.length ? past.map(h => {
-    const mins = Math.max(0, Math.round((s.time - h.at) / 60));
-    return `<li class="track">${thumb(h)}<div class="meta"><div class="t" dir="auto">${esc(titleOf(h))}</div><div class="a" dir="auto">${esc(artistOf(h))}</div></div><button class="mini-love${h.liked ? ' on' : ''}" data-play="${h.id}" data-liked="${h.liked}" title="دوستش دارم">♥ ${h.likes ? fa(h.likes) : ''}</button><span class="when">${mins < 1 ? 'همین الان' : rel.format(-mins, 'minute')}</span></li>`;
-  }).join('') : '<li class="empty">هنوز چیزی پخش نشده</li>';
-
-  // the ❤️ button and its animations live in likes.js
-  RadioLikes.show(now.id >= 0 && !live.airing ? { id: now.id, likes: now.likes, liked: now.liked } : null);
-  RadioFeedback.show(now.id >= 0 && !live.airing ? { id: now.id, reactions: now.reactions } : null);
-  RadioRequests.show(s.mine, s.catalog_open);
-}
-
-$('#history').addEventListener('click', async e => {
-  const b = e.target.closest('.mini-love');
-  if (!b) return;
-  b.classList.add('pop');
-  const r = await RadioLikes.toggle(+b.dataset.play, b.dataset.liked !== 'true');
-  if (r) poll();
-});
-
-function tick() {
-  if (!now) return;
-  if (live.airing) {
-    $('#elapsed').textContent = fmt(live.since + (performance.now() - nowAt) / 1000);
-    $('#duration').textContent = 'زنده';
-    $('#bar').style.width = '100%';
-    return;
-  }
-  const e = now.elapsed + (stationPaused ? 0 : (performance.now() - nowAt) / 1000);
-  const d = now.duration > 0 ? now.duration : 0;
-  $('#elapsed').textContent = now.file || now.title ? fmt(d ? Math.min(e, d) : e) : '';
-  $('#duration').textContent = d ? fmt(d) : '';
-  $('#bar').style.width = d ? Math.min(100, e / d * 100) + '%' : '0';
-}
-
-async function poll() {
-  if (document.hidden && !player.wanted) return;
-  try { render(await (await fetch('/api/now?listener=' + RadioLikes.listenerId, { cache: 'no-store' })).json()); }
-  catch (e) { $('#kicker').textContent = 'رادیو در دسترس نیست'; app.classList.remove('live'); }
-}
-async function listeners() {
-  try {
-    const s = (await (await fetch('/status-json.xsl', { cache: 'no-store' })).json()).icestats.source;
-    const src = [].concat(s || []).find(x => (x.listenurl || '').endsWith('/radio'));
-    const n = src ? src.listeners : 0;
-    $('#listeners').innerHTML = n ? `<b>${fa(n)}</b> نفر دارن گوش می‌دن` : 'هنوز کسی گوش نمی‌ده';
-  } catch (e) { $('#listeners').textContent = ''; }
-}
-
-/* ---------- visualizer: bars radiating around the record ---------- */
-const cv = $('#viz'), g = cv.getContext('2d');
-function sizeCanvas() {
-  const r = cv.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
-  cv.width = r.width * dpr; cv.height = r.height * dpr;
-}
-window.addEventListener('resize', sizeCanvas);
-sizeCanvas();
-
-const BARS = 96;
-const level = new Float32Array(BARS);
-function draw(t) {
-  requestAnimationFrame(draw);
-  if (document.hidden) return;
-  const W = cv.width, H = cv.height, cx = W / 2, cy = H / 2;
-  const R = W / 2 / 1.32;               // record radius inside the 132% canvas
-  const playing = app.classList.contains('playing');
-  if (analyser && playing) analyser.getByteFrequencyData(freq);
-  g.clearRect(0, 0, W, H);
-  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent');
-  g.strokeStyle = accent;
-  g.lineCap = 'round';
-  g.lineWidth = Math.max(2, W / 220);
-  g.shadowColor = accent;
-  g.shadowBlur = W / 60;
-  for (let i = 0; i < BARS; i++) {
-    const half = i < BARS / 2 ? i : BARS - 1 - i;       // mirror so the ring is symmetric
-    let v;
-    if (analyser && playing) v = freq[Math.floor(half / (BARS / 2) * freq.length * .72)] / 255;
-    else if (playing) v = .25 + .2 * Math.sin(t / 380 + half * .55) * Math.sin(t / 900 + half * .21);
-    else v = .05 + .03 * Math.sin(t / 900 + half * .4);
-    level[i] += (v - level[i]) * .25;
-    const len = R * .03 + level[i] * R * .2;
-    const a = (i / BARS) * Math.PI * 2 - Math.PI / 2;
-    const r0 = R * 1.035;
-    g.globalAlpha = .35 + level[i] * .65;
-    g.beginPath();
-    g.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
-    g.lineTo(cx + Math.cos(a) * (r0 + len), cy + Math.sin(a) * (r0 + len));
-    g.stroke();
-  }
-  g.globalAlpha = 1;
-}
-requestAnimationFrame(draw);
-
-/* ---------- media keys, link, timers ---------- */
-if ('mediaSession' in navigator) {
-  navigator.mediaSession.setActionHandler('play', start);
-  navigator.mediaSession.setActionHandler('pause', stop);
-  navigator.mediaSession.setActionHandler('stop', stop);
-}
-
-const link = `${location.protocol}//${location.host}/radio`;
-$('#link').textContent = link;
-$('#copy').onclick = async () => {
-  try { await navigator.clipboard.writeText(link); }
-  catch (e) {
-    const t = document.createElement('textarea');
-    t.value = link; document.body.appendChild(t); t.select();
-    try { document.execCommand('copy'); } catch (e2) {}
-    t.remove();
-  }
-  $('#copy').textContent = 'کپی شد ✓';
-  setTimeout(() => $('#copy').textContent = 'کپی', 1800);
-};
-
-poll(); listeners();
-setInterval(poll, 3000);
-setInterval(tick, 1000);
-setInterval(listeners, 10000);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) { poll(); sizeCanvas(); } });
-</script>
-</body>
-</html>
+</body></html>
